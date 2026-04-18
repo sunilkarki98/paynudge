@@ -58,6 +58,11 @@ export async function createInvoice(data: CreateInvoiceData) {
     }
   })
 
+  const user = await prisma.user.findUnique({
+    where: { id: data.userId },
+    select: { customIntervals: true }
+  })
+
   log.info('Invoice created', { invoiceId: invoice.id, userId: data.userId })
 
   // Fire event — notification module will handle scheduling
@@ -80,6 +85,7 @@ export async function createInvoice(data: CreateInvoiceData) {
     reminderTone: invoice.reminderTone,
     chaseUntilPaid: invoice.chaseUntilPaid,
     chaseIntervalDays: invoice.chaseIntervalDays,
+    customIntervals: user?.customIntervals,
   })
 
   return invoice
@@ -257,5 +263,133 @@ export async function updateInvoiceDetails(id: string, userId: string, updateDat
   return prisma.invoice.update({
     where: { id },
     data: updateData,
+  })
+}
+
+/**
+ * Send a manual reminder for an invoice.
+ * Directly calls email/SMS senders (bypasses BullMQ since it's user-initiated).
+ */
+export async function sendManualReminder(invoiceId: string, userId: string) {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, userId },
+    include: { paymentLink: true },
+  })
+
+  if (!invoice) throw new Error('Invoice not found')
+  if (invoice.status === 'PAID') throw new Error('Cannot send reminder for a paid invoice')
+
+  const { sendEmail } = await import('@/modules/communication/email-sender')
+  const { generateMessage } = await import('@/modules/ai/message-generator')
+
+  const amount = invoice.amount instanceof Prisma.Decimal
+    ? invoice.amount.toNumber()
+    : Number(invoice.amount)
+
+  const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const paymentLink = invoice.paymentLink?.token ? `${baseUrl}/pay/${invoice.paymentLink.token}` : undefined
+
+  const generated = await generateMessage({
+    clientName: invoice.clientName,
+    amount,
+    dueDate: invoice.dueDate.toISOString(),
+    stage: invoice.reminderStage || 1,
+    daysOverdue,
+    paymentLink,
+    tone: (invoice.reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+  })
+
+  const channelsUsed: string[] = []
+  const errors: string[] = []
+
+  // Send email
+  const shouldSendEmail = ['EMAIL', 'BOTH', 'EMAIL_AND_SMS', 'ALL'].includes(invoice.contactChannel)
+  if (shouldSendEmail) {
+    const emailResult = await sendEmail({
+      userId,
+      to: invoice.clientEmail,
+      subject: generated.subject,
+      htmlBody: generated.htmlBody,
+      plainText: generated.plainText,
+    })
+    if (emailResult.success) {
+      channelsUsed.push('email')
+    } else {
+      errors.push(`Email: ${emailResult.error}`)
+    }
+  }
+
+  // Send SMS
+  const shouldSendSms = ['SMS', 'EMAIL_AND_SMS', 'ALL'].includes(invoice.contactChannel) && invoice.smsNumber
+  if (shouldSendSms) {
+    try {
+      const { sendSMS } = await import('@/modules/communication/sms-sender')
+      const smsResult = await sendSMS({ userId, to: invoice.smsNumber!, message: generated.plainText || generated.subject })
+      if (smsResult.success) {
+        channelsUsed.push('sms')
+      } else {
+        errors.push(`SMS: ${smsResult.error}`)
+      }
+    } catch (err) {
+      errors.push(`SMS: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (channelsUsed.length === 0 && !shouldSendEmail && !shouldSendSms) {
+    // No channels configured, just send email as fallback
+    const emailResult = await sendEmail({
+      userId,
+      to: invoice.clientEmail,
+      subject: generated.subject,
+      htmlBody: generated.htmlBody,
+      plainText: generated.plainText,
+    })
+    if (emailResult.success) channelsUsed.push('email')
+    else errors.push(`Email: ${emailResult.error}`)
+  }
+
+  // Log the result
+  const status = channelsUsed.length > 0 ? 'sent' : 'failed'
+  await prisma.reminderLog.create({
+    data: {
+      invoiceId,
+      stage: 0, // 0 = manual
+      status,
+      channel: channelsUsed.join(',') || 'none',
+      tone: invoice.reminderTone,
+      messageBody: generated.plainText || generated.subject,
+      error: errors.length > 0 ? errors.join('; ') : null,
+    },
+  })
+
+  // Create audit event
+  await prisma.invoiceEvent.create({
+    data: {
+      invoiceId,
+      eventType: 'manual_reminder_sent',
+      metadata: { channels: channelsUsed, errors, daysOverdue },
+    },
+  })
+
+  log.info('Manual reminder sent', { invoiceId, channelsUsed, errors })
+
+  return { success: channelsUsed.length > 0, channels: channelsUsed, errors }
+}
+
+/**
+ * Get full reminder history for an invoice.
+ */
+export async function getReminderHistory(invoiceId: string, userId: string) {
+  // Verify ownership
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, userId },
+    select: { id: true },
+  })
+  if (!invoice) return null
+
+  return prisma.reminderLog.findMany({
+    where: { invoiceId },
+    orderBy: { sentAt: 'desc' },
   })
 }

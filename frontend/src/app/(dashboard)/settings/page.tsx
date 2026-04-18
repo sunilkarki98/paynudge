@@ -25,6 +25,16 @@ export default function SettingsPage() {
   const [twilioPhone, setTwilioPhone] = useState('')
   const [showTwilioForm, setShowTwilioForm] = useState(false)
 
+  // Preferences
+  const [stage2Days, setStage2Days] = useState(3)
+  const [stage3Days, setStage3Days] = useState(7)
+  const [stage4Days, setStage4Days] = useState(14)
+  const [chaseUntilPaid, setChaseUntilPaid] = useState(false)
+  const [chaseIntervalDays, setChaseIntervalDays] = useState(7)
+  const [preferencesLoading, setPreferencesLoading] = useState(true)
+  const [prefsSaved, setPrefsSaved] = useState(false)
+  const [prefsError, setPrefsError] = useState('')
+
   const fetchStatus = useCallback(async () => {
     try {
       const data = await apiFetch('/api/settings/status')
@@ -36,9 +46,53 @@ export default function SettingsPage() {
     }
   }, [apiFetch])
 
+  const fetchPreferences = useCallback(async () => {
+    try {
+      const data = await apiFetch('/api/settings/preferences')
+      if (data) {
+        if (data.customIntervals) {
+          setStage2Days(Number(data.customIntervals.stage2Days) || 3)
+          setStage3Days(Number(data.customIntervals.stage3Days) || 7)
+          setStage4Days(Number(data.customIntervals.stage4Days) || 14)
+        }
+        setChaseUntilPaid(Boolean(data.chaseUntilPaid))
+        setChaseIntervalDays(Number(data.chaseIntervalDays) || 7)
+      }
+    } catch {
+      // Silently fail
+    } finally {
+      setPreferencesLoading(false)
+    }
+  }, [apiFetch])
+
   useEffect(() => {
     fetchStatus()
-  }, [fetchStatus])
+    fetchPreferences()
+  }, [fetchStatus, fetchPreferences])
+
+  const savePreferences = async () => {
+    setError('')
+    setPrefsSaved(false)
+    setPrefsError('')
+    setActionLoading('preferences')
+    try {
+      await apiFetch('/api/settings/preferences', {
+        method: 'PUT',
+        body: JSON.stringify({
+          customIntervals: { stage2Days, stage3Days, stage4Days },
+          chaseUntilPaid,
+          chaseIntervalDays,
+        }),
+      })
+      setPrefsSaved(true)
+      setTimeout(() => setPrefsSaved(false), 3000)
+    } catch (err) {
+      setPrefsError(err instanceof Error ? err.message : 'Failed to save preferences')
+      setTimeout(() => setPrefsError(''), 5000)
+    } finally {
+      setActionLoading(null)
+    }
+  }
 
   // Handle Google OAuth callback redirect (backend redirects here with query params)
   useEffect(() => {
@@ -414,29 +468,152 @@ export default function SettingsPage() {
 
       {/* Reminder Schedule */}
       <div className="bg-white rounded-2xl p-6 border border-surface-border shadow-sm">
-        <h3 className="text-lg font-semibold text-text-primary mb-2">Reminder Schedule</h3>
-        <p className="text-sm text-text-secondary mb-6">Automatic reminders are sent for unpaid invoices based on their due date.</p>
-        <div className="space-y-3">
-          {[
-            { stage: 1, label: 'Due Date', description: 'Friendly reminder on the invoice due date', color: 'text-primary-600', bg: 'bg-primary-500/10' },
-            { stage: 2, label: '3 Days Overdue', description: 'Polite follow-up 3 days after due date', color: 'text-amber-600', bg: 'bg-amber-500/10' },
-            { stage: 3, label: '7 Days Overdue', description: 'Firm reminder 7 days after due date', color: 'text-orange-500', bg: 'bg-orange-500/10' },
-            { stage: 4, label: '14 Days Overdue', description: 'Final notice 14 days after due date', color: 'text-red-600', bg: 'bg-red-500/10' },
-          ].map((item) => (
-            <div key={item.stage} className={`flex items-center gap-4 p-4 rounded-xl ${item.bg} border border-surface-border`}>
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.color} font-bold text-sm bg-white/60`}>
-                {item.stage}
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-text-primary">Reminder Schedule</h3>
+          <div className="flex items-center gap-3">
+            {prefsSaved && (
+              <span className="flex items-center gap-1.5 text-sm font-medium text-green-600 animate-fade-in">
+                <CheckCircle className="w-4 h-4" />
+                Saved!
+              </span>
+            )}
+            {prefsError && (
+              <span className="flex items-center gap-1.5 text-sm font-medium text-red-600 animate-fade-in">
+                <AlertTriangle className="w-4 h-4" />
+                {prefsError}
+              </span>
+            )}
+            <button
+              onClick={savePreferences}
+              disabled={actionLoading === 'preferences' || preferencesLoading}
+              className="px-4 py-2 text-sm font-medium rounded-lg btn-primary disabled:opacity-50 flex items-center gap-2"
+            >
+              {actionLoading === 'preferences' && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save Schedule
+            </button>
+          </div>
+        </div>
+        <p className="text-sm text-text-secondary mb-6">Customize when automatic reminders are sent for unpaid invoices based on their due date.</p>
+        
+        {preferencesLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-primary-500/5 border border-surface-border">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-primary-600 font-bold text-sm bg-white/60">
+                1
               </div>
               <div className="flex-1">
-                <p className={`text-sm font-medium ${item.color}`}>{item.label}</p>
-                <p className="text-xs text-text-secondary mt-0.5">{item.description}</p>
+                <p className="text-sm font-medium text-primary-600">Stage 1: Due Date</p>
+                <p className="text-xs text-text-secondary mt-0.5">Friendly reminder on the invoice due date</p>
               </div>
-              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <div className="text-sm font-medium text-text-primary px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                Day 0
+              </div>
             </div>
-          ))}
-        </div>
+
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-amber-500/5 border border-surface-border">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-600 font-bold text-sm bg-white/60">
+                2
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-600">Stage 2: Polite Follow-up</p>
+                <p className="text-xs text-text-secondary mt-0.5">Send a polite follow-up when overdue</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  min="1" 
+                  max="30"
+                  value={stage2Days}
+                  onChange={(e) => setStage2Days(Number(e.target.value))}
+                  className="w-16 px-2 py-1 text-center text-sm border border-slate-200 rounded-lg shadow-sm"
+                />
+                <span className="text-xs font-medium text-text-secondary">days late</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-orange-500/5 border border-surface-border">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-orange-500 font-bold text-sm bg-white/60">
+                3
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-orange-500">Stage 3: Firm Reminder</p>
+                <p className="text-xs text-text-secondary mt-0.5">Send a firmer reminder as delay increases</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  min={stage2Days + 1} 
+                  max="60"
+                  value={stage3Days}
+                  onChange={(e) => setStage3Days(Number(e.target.value))}
+                  className="w-16 px-2 py-1 text-center text-sm border border-slate-200 rounded-lg shadow-sm"
+                />
+                <span className="text-xs font-medium text-text-secondary">days late</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 rounded-xl bg-red-500/5 border border-surface-border">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-red-600 font-bold text-sm bg-white/60">
+                4
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-600">Stage 4: Final Notice</p>
+                <p className="text-xs text-text-secondary mt-0.5">Send a strict final notice</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="number" 
+                  min={stage3Days + 1} 
+                  max="90"
+                  value={stage4Days}
+                  onChange={(e) => setStage4Days(Number(e.target.value))}
+                  className="w-16 px-2 py-1 text-center text-sm border border-slate-200 rounded-lg shadow-sm"
+                />
+                <span className="text-xs font-medium text-text-secondary">days late</span>
+              </div>
+            </div>
+
+            {/* Chase Until Paid Toggle */}
+            <div className="mt-6 pt-6 border-t border-surface-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-medium text-text-primary flex items-center gap-2">
+                    Chase Until Paid <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-100 text-blue-600">Powerful</span>
+                  </h4>
+                  <p className="text-xs text-text-secondary mt-1">If enabled, the system will infinitely loop Stage 4 reminders until the client pays.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={chaseUntilPaid}
+                    onChange={(e) => setChaseUntilPaid(e.target.checked)}
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                </label>
+              </div>
+              
+              {chaseUntilPaid && (
+                <div className="mt-4 flex items-center gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100 animate-fade-in">
+                  <p className="text-sm text-blue-800 font-medium">Repeat final notice every</p>
+                  <input 
+                    type="number" 
+                    min="1" 
+                    max="30"
+                    value={chaseIntervalDays}
+                    onChange={(e) => setChaseIntervalDays(Number(e.target.value))}
+                    className="w-16 px-2 py-1 text-center text-sm border border-blue-200 rounded-lg shadow-sm bg-white"
+                  />
+                  <p className="text-sm text-blue-800 font-medium">days.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

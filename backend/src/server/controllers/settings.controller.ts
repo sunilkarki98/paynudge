@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { getAuthorizationUrl, handleOAuthCallback, disconnectGoogle, isGoogleConnected } from '@/modules/communication/google-oauth'
 import { connectTwilio, disconnectTwilio, isTwilioConnected } from '@/modules/communication/sms-sender'
+import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'settings-controller' })
@@ -21,6 +22,44 @@ export async function getConnectionStatus(req: Request, res: Response): Promise<
       error: error instanceof Error ? error.message : String(error),
     })
     res.status(500).json({ error: 'Failed to get connection status' })
+  }
+}
+
+// ─── GET /api/settings/preferences ───────────────────────
+
+export async function getPreferences(req: Request, res: Response): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true },
+    })
+    res.json(user)
+  } catch (error) {
+    log.error('Failed to get preferences', {
+      userId: req.user!.userId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ error: 'Failed to get preferences' })
+  }
+}
+
+// ─── PUT /api/settings/preferences ───────────────────────
+
+export async function updatePreferences(req: Request, res: Response): Promise<void> {
+  try {
+    const { customIntervals, chaseIntervalDays, chaseUntilPaid } = req.body
+    const user = await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { customIntervals, chaseIntervalDays, chaseUntilPaid },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true },
+    })
+    res.json(user)
+  } catch (error) {
+    log.error('Failed to update preferences', {
+      userId: req.user!.userId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ error: 'Failed to update preferences' })
   }
 }
 

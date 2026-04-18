@@ -60,30 +60,40 @@ export async function scheduleOverdueChecks(data: {
   reminderTone: string
   chaseUntilPaid: boolean
   chaseIntervalDays: number
+  customIntervals?: any
 }): Promise<void> {
   const queue = getOverdueCheckQueue()
 
   let checkpoints: { daysOverdue: number; stage: number }[] = []
   
-  if (data.chasingProfile === 'STRICT') {
+  if (data.customIntervals && typeof data.customIntervals === 'object') {
+    const { stage2Days, stage3Days, stage4Days } = data.customIntervals
     checkpoints = [
-      { daysOverdue: 1, stage: 2 },
-      { daysOverdue: 3, stage: 3 },
-      { daysOverdue: 5, stage: 4 },
-    ]
-  } else if (data.chasingProfile === 'RELAXED') {
-    checkpoints = [
-      { daysOverdue: 7, stage: 2 },
-      { daysOverdue: 14, stage: 3 },
-      { daysOverdue: 30, stage: 4 },
+      { daysOverdue: Number(stage2Days) || 3, stage: 2 },
+      { daysOverdue: Number(stage3Days) || 7, stage: 3 },
+      { daysOverdue: Number(stage4Days) || 14, stage: 4 },
     ]
   } else {
-    // defaults to NORMAL
-    checkpoints = [
-      { daysOverdue: 3, stage: 2 },
-      { daysOverdue: 7, stage: 3 },
-      { daysOverdue: 14, stage: 4 },
-    ]
+    if (data.chasingProfile === 'STRICT') {
+      checkpoints = [
+        { daysOverdue: 1, stage: 2 },
+        { daysOverdue: 3, stage: 3 },
+        { daysOverdue: 5, stage: 4 },
+      ]
+    } else if (data.chasingProfile === 'RELAXED') {
+      checkpoints = [
+        { daysOverdue: 7, stage: 2 },
+        { daysOverdue: 14, stage: 3 },
+        { daysOverdue: 30, stage: 4 },
+      ]
+    } else {
+      // defaults to NORMAL
+      checkpoints = [
+        { daysOverdue: 3, stage: 2 },
+        { daysOverdue: 7, stage: 3 },
+        { daysOverdue: 14, stage: 4 },
+      ]
+    }
   }
 
   for (const checkpoint of checkpoints) {

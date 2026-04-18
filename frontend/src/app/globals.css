@@ -103,6 +103,20 @@
 }
 .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
+/* ── Slide In Right ──────────────────────────────────── */
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+/* ── Slide Down ──────────────────────────────────────── */
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); max-height: 0; }
+  to { opacity: 1; transform: translateY(0); max-height: 800px; }
+}
+.animate-slide-down { animation: slideDown 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; overflow: hidden; }
+
 /* ── Stagger Children ────────────────────────────────── */
 .stagger-children > * { opacity: 0; animation: fadeIn 0.5s ease-out forwards; }
 .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
@@ -126,8 +140,7 @@ input:focus, select:focus, textarea:focus {
 
 /* ── Modal Backdrop ──────────────────────────────────── */
 .modal-backdrop {
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(4px);
+  background: rgba(15, 23, 42, 0.5);
 }
 
 /* ── Status Badge Pulse ──────────────────────────────── */

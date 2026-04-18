@@ -10,7 +10,9 @@ import {
   deleteInvoice,
   getInvoices as getInvoicesService,
   getInvoiceById,
-  updateInvoiceDetails
+  updateInvoiceDetails,
+  sendManualReminder,
+  getReminderHistory
 } from '@/modules/invoice/invoice.service'
 
 const log = logger.child({ module: 'invoice-controller' })
@@ -214,6 +216,62 @@ export async function deleteInvoiceHandler(req: Request, res: Response): Promise
     res.json({ message: 'Invoice deleted' })
   } catch (error) {
     log.error('Delete invoice error', { error: error instanceof Error ? error.message : String(error) })
+    res.status(500).json({ error: 'Internal server error' })
+  }
+}
+
+// ─── POST /api/invoices/:id/remind ──────────────────────
+
+export async function sendReminderHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const id = req.params.id as string
+    const result = await sendManualReminder(id, req.user!.userId)
+
+    if (!result.success) {
+      res.status(500).json({
+        error: 'Failed to send reminder',
+        details: result.errors,
+      })
+      return
+    }
+
+    res.json({
+      success: true,
+      channels: result.channels,
+      message: `Reminder sent via ${result.channels.join(', ')}`,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    log.error('Send reminder error', { error: message })
+
+    if (message === 'Invoice not found') {
+      res.status(404).json({ error: message })
+      return
+    }
+    if (message.includes('paid invoice')) {
+      res.status(400).json({ error: message })
+      return
+    }
+
+    res.status(500).json({ error: message })
+  }
+}
+
+// ─── GET /api/invoices/:id/history ───────────────────────
+
+export async function getReminderHistoryHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const id = req.params.id as string
+    const history = await getReminderHistory(id, req.user!.userId)
+
+    if (history === null) {
+      res.status(404).json({ error: 'Invoice not found' })
+      return
+    }
+
+    res.json({ data: history })
+  } catch (error) {
+    log.error('Get reminder history error', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Internal server error' })
   }
 }

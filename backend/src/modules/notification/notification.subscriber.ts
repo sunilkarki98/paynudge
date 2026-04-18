@@ -114,6 +114,7 @@ async function onInvoiceCreated(event: InvoiceCreatedEvent): Promise<void> {
     reminderTone: event.reminderTone,
     chaseUntilPaid: event.chaseUntilPaid,
     chaseIntervalDays: event.chaseIntervalDays,
+    customIntervals: event.customIntervals,
   })
 
   log.info('All jobs scheduled for new invoice', {

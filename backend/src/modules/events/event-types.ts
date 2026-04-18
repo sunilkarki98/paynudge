@@ -21,6 +21,7 @@ export interface InvoiceCreatedEvent {
   reminderTone: string
   chaseUntilPaid: boolean
   chaseIntervalDays: number
+  customIntervals?: any
 }
 
 export interface InvoicePaymentDueEvent {

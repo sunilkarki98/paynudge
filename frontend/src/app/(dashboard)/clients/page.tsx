@@ -111,6 +111,7 @@ export default function ClientsPage() {
   }
 
   return (
+    <>
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -205,121 +206,122 @@ export default function ClientsPage() {
           })
         )}
       </div>
+    </div>
 
-      {/* Client Modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 modal-backdrop" onClick={() => setModalOpen(false)}>
-          <div
-            className="w-full max-w-md glass-card rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-6 border-b border-surface-border shrink-0">
-              <h2 className="text-xl font-semibold text-text-primary">
-                {editClient ? 'Edit Client' : 'Add Client'}
-              </h2>
-              <button onClick={() => setModalOpen(false)} className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+    {/* Client Modal — rendered outside animated div to fix fixed positioning */}
+    {modalOpen && (
+      <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 pt-6 sm:pt-8 modal-backdrop" onClick={() => setModalOpen(false)}>
+        <div
+          className="w-full max-w-md bg-white rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[calc(100vh-5rem)] sm:max-h-[calc(100vh-6rem)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between p-6 border-b border-surface-border shrink-0">
+            <h2 className="text-xl font-semibold text-text-primary">
+              {editClient ? 'Edit Client' : 'Add Client'}
+            </h2>
+            <button onClick={() => setModalOpen(false)} className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
+            {formError && (
+              <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/20 text-red-600 text-sm">{formError}</div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Name *</label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                placeholder="Client name"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-primary mb-2">Email *</label>
+              <input
+                type="email"
+                required
+                value={formData.email}
+                onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                placeholder="client@example.com"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">WhatsApp Number</label>
+                <input
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData((p) => ({ ...p, whatsappNumber: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                  placeholder="+1234567890"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">SMS Number</label>
+                <input
+                  type="tel"
+                  value={formData.smsNumber}
+                  onChange={(e) => setFormData((p) => ({ ...p, smsNumber: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                  placeholder="+1234567890"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Risk Profile</label>
+                <select
+                  value={formData.chasingProfile}
+                  onChange={(e) => setFormData((p) => ({ ...p, chasingProfile: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                >
+                  <option value="STRICT">Strict (Fast)</option>
+                  <option value="NORMAL">Normal</option>
+                  <option value="RELAXED">Relaxed (Slow)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Channel Options</label>
+                <select
+                  value={formData.contactChannel}
+                  onChange={(e) => setFormData((p) => ({ ...p, contactChannel: e.target.value }))}
+                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
+                >
+                  <option value="EMAIL">Email Only</option>
+                  <option value="WHATSAPP">WhatsApp Only</option>
+                  <option value="SMS">SMS Only</option>
+                  <option value="BOTH">Email + WhatsApp</option>
+                  <option value="EMAIL_AND_SMS">Email + SMS</option>
+                  <option value="ALL">All Channels</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setModalOpen(false)}
+                className="flex-1 px-6 py-3 rounded-xl border border-surface-border text-text-primary hover:text-text-primary hover:bg-surface-raised font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={formLoading}
+                className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-text-primary font-medium hover:shadow-lg hover:shadow-primary-500/25 disabled:opacity-50"
+              >
+                {formLoading ? 'Saving...' : editClient ? 'Update' : 'Add Client'}
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
-              {formError && (
-                <div className="p-3 rounded-xl bg-red-500/15 border border-red-500/20 text-red-600 text-sm">{formError}</div>
-              )}
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">Name *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData((p) => ({ ...p, name: e.target.value }))}
-                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                  placeholder="Client name"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-text-primary mb-2">Email *</label>
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => setFormData((p) => ({ ...p, email: e.target.value }))}
-                  className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                  placeholder="client@example.com"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">WhatsApp Number</label>
-                  <input
-                    type="tel"
-                    value={formData.whatsappNumber}
-                    onChange={(e) => setFormData((p) => ({ ...p, whatsappNumber: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                    placeholder="+1234567890"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">SMS Number</label>
-                  <input
-                    type="tel"
-                    value={formData.smsNumber}
-                    onChange={(e) => setFormData((p) => ({ ...p, smsNumber: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                    placeholder="+1234567890"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Risk Profile</label>
-                  <select
-                    value={formData.chasingProfile}
-                    onChange={(e) => setFormData((p) => ({ ...p, chasingProfile: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                  >
-                    <option value="STRICT">Strict (Fast)</option>
-                    <option value="NORMAL">Normal</option>
-                    <option value="RELAXED">Relaxed (Slow)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-text-primary mb-2">Channel Options</label>
-                  <select
-                    value={formData.contactChannel}
-                    onChange={(e) => setFormData((p) => ({ ...p, contactChannel: e.target.value }))}
-                    className="w-full px-4 py-3 rounded-xl bg-surface-raised border border-surface-border text-text-primary placeholder-slate-500 focus:border-primary-500"
-                  >
-                    <option value="EMAIL">Email Only</option>
-                    <option value="WHATSAPP">WhatsApp Only</option>
-                    <option value="SMS">SMS Only</option>
-                    <option value="BOTH">Email + WhatsApp</option>
-                    <option value="EMAIL_AND_SMS">Email + SMS</option>
-                    <option value="ALL">All Channels</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="flex-1 px-6 py-3 rounded-xl border border-surface-border text-text-primary hover:text-text-primary hover:bg-surface-raised font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={formLoading}
-                  className="flex-1 px-6 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-accent-500 text-text-primary font-medium hover:shadow-lg hover:shadow-primary-500/25 disabled:opacity-50"
-                >
-                  {formLoading ? 'Saving...' : editClient ? 'Update' : 'Add Client'}
-                </button>
-              </div>
-            </form>
-          </div>
+          </form>
         </div>
-      )}
-    </div>
+      </div>
+    )}
+    </>
   )
 }

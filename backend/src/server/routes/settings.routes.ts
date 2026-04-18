@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { getConnectionStatus, getEmailAuthUrl, connectEmail, disconnectEmail, connectSms, disconnectSms, googleOAuthCallback } from '../controllers/settings.controller'
+import { getConnectionStatus, getEmailAuthUrl, connectEmail, disconnectEmail, connectSms, disconnectSms, googleOAuthCallback, getPreferences, updatePreferences } from '../controllers/settings.controller'
 import { authMiddleware } from '../middleware/auth'
 
 const router = Router()
@@ -12,6 +12,10 @@ router.use(authMiddleware)
 
 // Connection status
 router.get('/status', getConnectionStatus)
+
+// Preferences
+router.get('/preferences', getPreferences)
+router.put('/preferences', updatePreferences)
 
 // Email (Google OAuth)
 router.get('/email/connect', getEmailAuthUrl)

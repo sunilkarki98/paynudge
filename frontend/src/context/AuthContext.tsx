@@ -27,6 +27,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    let initialSessionHandled = false
+
     // Fetch subscription details from backend
     const fetchSubscription = async (token: string, baseUser: any) => {
       try {
@@ -45,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Check active session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         const baseUser = {
           id: session.user.id,
@@ -53,14 +55,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
           emailVerified: !!session.user.email_confirmed_at,
         }
-        fetchSubscription(session.access_token, baseUser)
-      } else {
-        setIsLoading(false)
+        await fetchSubscription(session.access_token, baseUser)
       }
+      initialSessionHandled = true
+      setIsLoading(false)
     })
 
-    // Listen for auth changes
+    // Listen for auth changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Skip if the initial session hasn't been handled yet — getSession handles it
+      if (!initialSessionHandled) return
+
       if (session?.user) {
         const baseUser = {
           id: session.user.id,
@@ -72,7 +77,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setUser(null)
       }
-      setIsLoading(false)
     })
 
     return () => subscription.unsubscribe()
