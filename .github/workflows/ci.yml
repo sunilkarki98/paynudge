@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install Frontend Dependencies
+      working-directory: ./frontend
+      run: npm ci
+
+    - name: Install Backend Dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Lint Frontend
+      working-directory: ./frontend
+      run: npm run lint
+
+    - name: Typecheck Frontend
+      working-directory: ./frontend
+      run: npx tsc --noEmit
+
+    - name: Generate Prisma Client
+      working-directory: ./backend
+      run: npx prisma generate
+
+    - name: Typecheck Backend
+      working-directory: ./backend
+      run: npx tsc --noEmit
+
+    - name: Test Backend
+      working-directory: ./backend
+      run: npm run test --if-present
+
+    - name: Test Frontend
+      working-directory: ./frontend
+      run: npm run test --if-present

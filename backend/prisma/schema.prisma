@@ -1,0 +1,257 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────
+
+enum InvoiceStatus {
+  PAID
+  UNPAID
+}
+
+enum ChasingProfile {
+  STRICT
+  NORMAL
+  RELAXED
+}
+
+enum ContactChannel {
+  EMAIL
+  SMS
+  EMAIL_AND_SMS
+  // Legacy values — kept for backward compatibility, disabled in UI
+  WHATSAPP
+  BOTH
+  ALL
+}
+
+enum ReminderTone {
+  FRIENDLY
+  PROFESSIONAL
+  FIRM
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SubscriptionTier {
+  FREE
+  PRO
+}
+
+// ─── User ────────────────────────────────────────────────
+
+model User {
+  id                String    @id @db.Uuid
+  email             String    @unique
+  name              String?
+  
+  // Reminder preferences
+  defaultTone       ReminderTone @default(PROFESSIONAL)
+  customIntervals   Json?     // User-defined reminder intervals: { stage2Days: 3, stage3Days: 7, stage4Days: 14 }
+  chaseUntilPaid    Boolean   @default(false)  // Global default for new invoices
+  chaseIntervalDays Int       @default(7)      // Default recurring chase interval
+  isAdmin           Boolean   @default(false)
+
+  // Subscription & Billing
+  subscriptionTier           SubscriptionTier @default(FREE)
+  lemonSqueezyCustomerId     String?          @unique
+  lemonSqueezySubscriptionId String?          @unique
+  subscriptionStatus         String?
+  subscriptionPeriodEnd      DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  invoices          Invoice[]
+  clients           Client[]
+  credentials       UserCredential[]
+}
+
+// ─── Client ──────────────────────────────────────────────
+
+model Client {
+  id             String         @id @default(cuid())
+  userId         String         @db.Uuid
+  name           String
+  email          String
+  whatsappNumber String?        // Kept for data compatibility
+  smsNumber      String?
+  chasingProfile ChasingProfile @default(NORMAL)
+  contactChannel ContactChannel @default(EMAIL)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices       Invoice[]
+
+  @@unique([userId, email])
+  @@index([userId])
+}
+
+// ─── Invoice ─────────────────────────────────────────────
+
+model Invoice {
+  id                 String           @id @default(cuid())
+  userId             String           @db.Uuid
+  clientId           String?
+  clientName         String
+  clientEmail        String
+  amount             Decimal          @db.Decimal(12, 2)
+  dueDate            DateTime
+  description        String?
+  status             InvoiceStatus    @default(UNPAID)
+  invoiceNumber      String?          // User-visible invoice number (e.g., INV-001)
+  
+  // Contact Configuration Snapshot
+  whatsappNumber     String?          // Kept for data compatibility
+  smsNumber          String?
+  chasingProfile     ChasingProfile   @default(NORMAL)
+  contactChannel     ContactChannel   @default(EMAIL)
+
+  // AI & Smart Chasing
+  reminderTone       ReminderTone     @default(PROFESSIONAL)
+  chaseUntilPaid     Boolean          @default(false)
+  chaseIntervalDays  Int              @default(7)  // Repeat every N days after stage 4
+
+  // Reminder tracking
+  reminderStage      Int              @default(0) // 0=none, 1=due, 2=stage1, 3=stage2, 4=stage3
+  lastReminderSentAt DateTime?
+  lastChaseSentAt    DateTime?        // Last recurring chase reminder
+  idempotencyKeys    String[]         @default([])
+
+  // File ingestion
+  sourceFile         String?          // Original uploaded file path/reference
+  
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  
+  // Relations
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client             Client?          @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  reminderLogs       ReminderLog[]
+  paymentLink        PaymentLink?
+  trackingEvents     InvoiceTracking[]
+  invoiceEvents      InvoiceEvent[]
+  aiMetadata         AIMetadata?
+
+  @@index([userId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([status, reminderStage, dueDate])
+  @@index([invoiceNumber])
+}
+
+// ─── Reminder Log ────────────────────────────────────────
+
+model ReminderLog {
+  id              String   @id @default(cuid())
+  invoiceId       String
+  stage           Int
+  status          String   // "sent", "failed", "skipped", "dead_letter"
+  error           String?
+  jobId           String?  // BullMQ job ID for traceability
+  idempotencyKey  String?  // The key used for deduplication
+  channel         String?  // "email", "sms", "system" — which channel was used
+  tone            String?  // Which tone was used for message generation
+  messageBody     String?  // Generated message content (for audit trail)
+  sentAt          DateTime @default(now())
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([sentAt])
+  @@index([idempotencyKey])
+}
+
+// ─── Invoice Event (Lifecycle Audit Log) ─────────────────
+
+model InvoiceEvent {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  eventType   String   // invoice_created, invoice_due_soon, invoice_overdue, payment_received, reminder_sent, email_opened, link_clicked
+  metadata    Json?    // Flexible payload (stage, channel, risk score, etc.)
+  createdAt   DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// ─── User Credentials (Encrypted OAuth/API Tokens) ───────
+
+model UserCredential {
+  id            String    @id @default(cuid())
+  userId        String    @db.Uuid
+  provider      String    // "google_oauth", "twilio"
+  accessToken   String    // Encrypted with AES-256-GCM
+  refreshToken  String?   // Encrypted
+  tokenExpiry   DateTime?
+  metadata      Json?     // Provider-specific data (email for Google, phone for Twilio)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+}
+
+// ─── Payment Link (One-Click Pay) ────────────────────────
+
+model PaymentLink {
+  id          String    @id @default(cuid())
+  invoiceId   String    @unique
+  token       String    @unique @default(cuid()) // Public URL-safe token
+  isActive    Boolean   @default(true)
+  clickCount  Int       @default(0)
+  lastClickAt DateTime?
+  createdAt   DateTime  @default(now())
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+}
+
+// ─── Invoice Tracking (Open/Read/Click Events) ──────────
+
+model InvoiceTracking {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  event       String   // "email_opened", "link_clicked", "payment_page_viewed"
+  channel     String?  // "email", "sms"
+  metadata    Json?    // IP, user-agent, timestamp context
+  createdAt   DateTime @default(now())
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([event])
+  @@index([createdAt])
+}
+
+// ─── AI Metadata (Risk Scoring + Extraction Data) ────────
+
+model AIMetadata {
+  id             String    @id @default(cuid())
+  invoiceId      String    @unique
+  riskScore      RiskLevel @default(MEDIUM)
+  riskFactors    Json?     // Array of risk factor strings
+  extractedData  Json?     // Raw AI-extracted fields from ingestion
+  suggestedTone  ReminderTone? // AI-suggested tone based on context
+  llmResponse    Json?     // Raw LLM response for audit
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  invoice        Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+// ─── System Settings (For Admin AI Config) ─────────────
+
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
