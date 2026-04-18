@@ -16,6 +16,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       unpaidInvoices,
       overdueInvoices,
       totalPendingResult,
+      totalCollectedResult,
       recentInvoices,
     ] = await Promise.all([
       prisma.invoice.count({
@@ -29,6 +30,10 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       }),
       prisma.invoice.aggregate({
         where: { userId: req.user!.userId, status: 'UNPAID' },
+        _sum: { amount: true },
+      }),
+      prisma.invoice.aggregate({
+        where: { userId: req.user!.userId, status: 'PAID' },
         _sum: { amount: true },
       }),
       prisma.invoice.findMany({
@@ -54,6 +59,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       val ? parseFloat(val.toString()) : 0
 
     const totalPendingAmount = toNumber(totalPendingResult._sum.amount)
+    const totalCollectedAmount = toNumber(totalCollectedResult._sum.amount)
 
     log.info('Dashboard query result', {
       userId: req.user!.userId,
@@ -69,6 +75,7 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       dueInvoices,
       overdueInvoices,
       totalPendingAmount,
+      totalCollectedAmount,
       recentInvoices,
     })
   } catch (error) {

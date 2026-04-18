@@ -247,15 +247,15 @@ export default function InvoicesPage() {
       <div className="glass-card rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-text-secondary border-b border-surface-border">
-                <th className="px-6 py-4 font-medium">Invoice</th>
-                <th className="px-6 py-4 font-medium">Client</th>
-                <th className="px-6 py-4 font-medium">Amount</th>
-                <th className="px-6 py-4 font-medium">Due Date</th>
-                <th className="px-6 py-4 font-medium">Status</th>
-                <th className="px-6 py-4 font-medium">Reminders</th>
-                <th className="px-6 py-4 font-medium text-right">Actions</th>
+            <thead className="bg-surface-raised border-b border-surface-border">
+              <tr className="text-left text-xs uppercase tracking-wider text-text-secondary">
+                <th className="px-6 py-4 font-bold">Invoice</th>
+                <th className="px-6 py-4 font-bold">Client</th>
+                <th className="px-6 py-4 font-bold">Amount</th>
+                <th className="px-6 py-4 font-bold">Due Date</th>
+                <th className="px-6 py-4 font-bold">Status</th>
+                <th className="px-6 py-4 font-bold">Reminders</th>
+                <th className="px-6 py-4 font-bold text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -273,55 +273,55 @@ export default function InvoicesPage() {
                   const isPaid = invoice.status.toUpperCase() === 'PAID'
                   return (
                   <tr key={invoice.id} className="border-b border-surface-border table-row-hover">
-                    <td className="px-6 py-4">
-                      <span className="text-xs font-mono text-text-muted">#{invoice.id.slice(-8).toUpperCase()}</span>
+                    <td className="px-6 py-5 text-sm font-mono text-text-muted">
+                      #{invoice.id.slice(-8).toUpperCase()}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
                       <div>
-                        <p className="text-sm font-medium text-text-primary">{invoice.clientName}</p>
-                        <p className="text-xs text-text-muted">{invoice.clientEmail}</p>
+                        <p className="text-sm font-semibold text-text-primary">{invoice.clientName}</p>
+                        <p className="text-xs text-text-secondary font-medium">{invoice.clientEmail}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm font-semibold text-text-primary">{formatCurrency(invoice.amount)}</td>
-                    <td className="px-6 py-4 text-sm text-text-primary">
+                    <td className="px-6 py-5 text-sm font-bold text-text-primary">{formatCurrency(invoice.amount)}</td>
+                    <td className="px-6 py-5 text-sm font-medium text-text-secondary">
                       {new Date(invoice.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-5">
                       <StatusBadge status={invoice.status} dueDate={invoice.dueDate} />
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex gap-1">
+                    <td className="px-6 py-5">
+                      <div className="flex gap-1.5">
                         {[1, 2, 3, 4].map((stage) => (
                           <div
                             key={stage}
-                            className={`w-2 h-2 rounded-full ${
+                            className={`w-2.5 h-2.5 rounded-full ${
                               invoice.reminderStage >= stage
-                                ? stage <= 2 ? 'bg-amber-400' : 'bg-red-400'
-                                : 'bg-slate-700'
+                                ? stage <= 2 ? 'bg-amber-400 shadow-sm' : 'bg-red-500 shadow-sm'
+                                : 'bg-slate-200 shadow-inner'
                             }`}
                             title={`Reminder ${stage}${invoice.reminderStage >= stage ? ' (sent)' : ''}`}
                           />
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center justify-end gap-2">
                         {/* Send Reminder (only for unpaid) */}
                         {!isPaid && (
                           <div className="relative">
                             <button
                               onClick={() => handleSendReminder(invoice)}
                               disabled={sendingReminderId === invoice.id}
-                              className="p-2 rounded-lg text-blue-600 hover:bg-blue-500/10 disabled:opacity-50"
+                              className="p-2 rounded-xl text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 disabled:opacity-50 transition-colors"
                               title="Send reminder now"
                             >
                               {sendingReminderId === invoice.id ? (
-                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
                               ) : (
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                                 </svg>
                               )}
@@ -330,7 +330,7 @@ export default function InvoicesPage() {
                             {reminderFeedback?.id === invoice.id && (
                               <div className={`absolute bottom-full right-0 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in z-10 ${
                                 reminderFeedback.type === 'success'
-                                  ? 'bg-green-600 text-white'
+                                  ? 'bg-emerald-600 text-white'
                                   : 'bg-red-600 text-white'
                               }`}>
                                 {reminderFeedback.message}
@@ -341,41 +341,41 @@ export default function InvoicesPage() {
                         {/* View History */}
                         <button
                           onClick={() => handleViewHistory(invoice)}
-                          className="p-2 rounded-lg text-text-secondary hover:text-primary-600 hover:bg-primary-500/10"
+                          className="p-2 rounded-xl text-text-secondary hover:text-primary-600 hover:bg-primary-500/15 transition-colors"
                           title="View reminder history"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => handleToggleStatus(invoice)}
-                          className={`p-2 rounded-lg ${
+                          className={`p-2 rounded-xl transition-colors ${
                             isPaid
-                              ? 'text-amber-600 hover:bg-amber-500/10'
-                              : 'text-emerald-600 hover:bg-emerald-500/10'
+                              ? 'text-amber-600 hover:bg-amber-500/15 hover:text-amber-700'
+                              : 'text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700'
                           }`}
                           title={isPaid ? 'Mark unpaid' : 'Mark paid'}
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isPaid ? 'M6 18L18 6M6 6l12 12' : 'M5 13l4 4L19 7'} />
                           </svg>
                         </button>
                         <button
                           onClick={() => handleEdit(invoice)}
-                          className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-raised"
-                          title="Edit"
+                          className="p-2 rounded-xl text-text-secondary hover:text-indigo-600 hover:bg-indigo-500/15 transition-colors"
+                          title="Edit invoice"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
                         </button>
                         <button
                           onClick={() => handleDelete(invoice.id)}
-                          className="p-2 rounded-lg text-text-secondary hover:text-red-600 hover:bg-red-500/10"
-                          title="Delete"
+                          className="p-2 rounded-xl text-text-secondary hover:text-red-600 hover:bg-red-500/15 transition-colors"
+                          title="Delete invoice"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>

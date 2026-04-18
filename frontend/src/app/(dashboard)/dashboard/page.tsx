@@ -11,6 +11,7 @@ interface DashboardData {
   dueInvoices: number
   overdueInvoices: number
   totalPendingAmount: number
+  totalCollectedAmount: number
   recentInvoices: Array<{
     id: string
     clientName: string
@@ -83,7 +84,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Action Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 stagger-children">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 stagger-children">
         <StatsCard
           title="Paid Invoices"
           value={data.paidInvoices}
@@ -127,6 +128,17 @@ export default function DashboardPage() {
           }
           gradient="from-indigo-500 to-purple-500"
         />
+        <StatsCard
+          title="Total Collected"
+          value={formatCurrency(data.totalCollectedAmount)}
+          subtitle="Revenue from paid invoices"
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          }
+          gradient="from-emerald-400 to-teal-500"
+        />
       </div>
 
       {/* Recent Invoices */}
@@ -136,29 +148,29 @@ export default function DashboardPage() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-text-secondary border-b border-surface-border">
-                <th className="px-6 py-4 font-medium">Client</th>
-                <th className="px-6 py-4 font-medium">Amount</th>
-                <th className="px-6 py-4 font-medium">Due Date</th>
-                <th className="px-6 py-4 font-medium">Status / Risk</th>
+            <thead className="bg-surface-raised border-b border-surface-border">
+              <tr className="text-left text-xs uppercase tracking-wider text-text-secondary">
+                <th className="px-6 py-4 font-bold">Client</th>
+                <th className="px-6 py-4 font-bold">Amount</th>
+                <th className="px-6 py-4 font-bold">Due Date</th>
+                <th className="px-6 py-4 font-bold">Status / Risk</th>
               </tr>
             </thead>
             <tbody>
               {data.recentInvoices.map((invoice) => (
                 <tr key={invoice.id} className="border-b border-surface-border table-row-hover">
-                  <td className="px-6 py-4 text-sm text-text-primary font-medium">{invoice.clientName}</td>
-                  <td className="px-6 py-4 text-sm text-text-primary">{formatCurrency(invoice.amount)}</td>
-                  <td className="px-6 py-4 text-sm text-text-primary">
+                  <td className="px-6 py-5 text-sm text-text-primary font-semibold">{invoice.clientName}</td>
+                  <td className="px-6 py-5 text-sm text-text-secondary font-medium">{formatCurrency(invoice.amount)}</td>
+                  <td className="px-6 py-5 text-sm text-text-secondary font-medium">
                     {new Date(invoice.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
-                  <td className="px-6 py-4 flex flex-col gap-1 items-start">
+                  <td className="px-6 py-5 flex flex-col gap-2 items-start">
                     <StatusBadge status={invoice.status} dueDate={invoice.dueDate} />
                     {invoice.aiMetadata && invoice.status !== 'PAID' && (
-                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border ${
-                        invoice.aiMetadata.riskScore === 'HIGH' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                        invoice.aiMetadata.riskScore === 'MEDIUM' ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' :
-                        'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border shadow-sm ${
+                        invoice.aiMetadata.riskScore === 'HIGH' ? 'bg-red-50 text-red-700 border-red-200' :
+                        invoice.aiMetadata.riskScore === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-emerald-50 text-emerald-700 border-emerald-200'
                       }`}>
                         AI Risk: {invoice.aiMetadata.riskScore}
                       </span>
