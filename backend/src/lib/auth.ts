@@ -33,7 +33,23 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const email = decoded.email || ''
     const role = decoded.role || 'authenticated'
 
-
+    // Synchronize user record in our local database
+    // This is required because our schema has foreign keys to the User table
+    try {
+      const { prisma } = await import('./prisma')
+      await prisma.user.upsert({
+        where: { id: userId },
+        update: { email }, // Update email if it changed
+        create: {
+          id: userId,
+          email,
+          name: decoded.user_metadata?.full_name || decoded.user_metadata?.name || null,
+        }
+      })
+    } catch (syncErr) {
+      log.error('Failed to sync user to local DB', { userId, error: syncErr })
+      // We continue anyway, but downstream FKs might fail
+    }
 
     return {
       userId,
