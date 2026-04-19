@@ -1,6 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { api } from '@/lib/api'
+import { useAuth } from '@/context/AuthContext'
+import { CreditCard, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react'
 
 export default function BillingSettingsPage() {
   const { user } = useAuth()

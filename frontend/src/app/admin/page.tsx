@@ -1,6 +1,21 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
+
+interface ModelMeta {
+  id: string
+  displayName: string
+  description: string
+}
+
+interface UserData {
+  id: string
+  email: string
+  name: string | null
+  subscriptionTier: 'FREE' | 'PRO'
+  createdAt: string
+}
 
 export default function AdminSettingsPage() {
   const [adminKey, setAdminKey] = useState('')
@@ -112,13 +127,10 @@ export default function AdminSettingsPage() {
     }
   }
 
-  // ─── User Management Methods ───────────────────────────
-
   const handleTierChange = async (userId: string, newTier: 'FREE' | 'PRO') => {
     try {
-      await fetchWithKey(`/api/admin/users/${userId}/tier`, {
-        method: 'POST',
-        body: JSON.stringify({ tier: newTier })
+      await api.post(`/admin/users/${userId}/tier`, { tier: newTier }, {
+        headers: { 'x-admin-key': adminKey }
       })
       
       // Optimistically update UI
@@ -127,8 +139,6 @@ export default function AdminSettingsPage() {
       alert('Failed to update user tier')
     }
   }
-
-  // ─── Renderers ─────────────────────────────────────────
 
   if (!isUnlocked) {
     return (
@@ -173,7 +183,6 @@ export default function AdminSettingsPage() {
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="flex items-center gap-2 p-1 glass-card border border-surface-border rounded-xl">
           <button
             onClick={() => setActiveTab('ai')}
@@ -206,12 +215,9 @@ export default function AdminSettingsPage() {
           </div>
       )}
 
-      {/* ─── AI Config Tab ─── */}
       {activeTab === 'ai' && (
         <div className="glass-card rounded-2xl p-6 md:p-8 max-w-3xl border border-surface-border">
             <form onSubmit={handleSaveAI} className="space-y-6">
-              
-              {/* API Key */}
                <div className="space-y-2">
                   <label className="block text-sm font-semibold tracking-wider text-text-primary uppercase">
                       Master Google Gemini API Key
@@ -239,7 +245,6 @@ export default function AdminSettingsPage() {
   
               <div className="h-px bg-surface-border my-6" />
   
-              {/* Model Drops */}
               <div className="space-y-6">
                   <div>
                      <label className="block text-sm font-semibold tracking-wider text-text-primary uppercase mb-2">
@@ -293,7 +298,6 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
-      {/* ─── User Management Tab ─── */}
       {activeTab === 'users' && (
         <div className="glass-card rounded-2xl border border-surface-border overflow-hidden">
           <div className="overflow-x-auto">
@@ -356,7 +360,6 @@ export default function AdminSettingsPage() {
           </div>
         </div>
       )}
-
     </div>
   )
 }
