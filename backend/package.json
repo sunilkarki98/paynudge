@@ -12,10 +12,13 @@
     "db:seed": "npx tsx prisma/seed.ts",
     "db:reset": "npx prisma db push --force-reset && npx tsx prisma/seed.ts",
     "postinstall": "npx prisma generate",
-    "build": "tsup src/server/index.ts src/workers/worker-entry.ts --format cjs --clean",
-    "start:server": "node dist/server/index.js",
-    "start:worker": "node dist/workers/worker-entry.js",
+    "build": "npx prisma generate && tsup src/server/index.ts src/workers/worker-entry.ts --format cjs --clean",
+    "start:server": "node dist/index.js",
+    "start:worker": "node dist/worker-entry.js",
     "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

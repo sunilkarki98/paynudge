@@ -3,19 +3,13 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useAuth } from '@/context/AuthContext'
 import {
-  Mail,
-  MessageSquare,
   Shield,
   FileUp,
   AlertTriangle,
   ArrowRight,
   Inbox,
-  Upload,
-  DollarSign,
-  BarChart3,
   Zap,
   Clock,
   CheckCircle,
@@ -61,7 +55,7 @@ export default function LandingPage() {
         },
         timestamp: Date.now(),
       }),
-    }).catch(() => {})
+    }).catch(() => { })
   }, [])
   // #endregion
 
@@ -283,7 +277,7 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-        {/* FAQ Section */}
+              {/* FAQ Section */}
               {/* Free Trial */}
               <div className="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform">
                 <div className="mb-6">
