@@ -27,6 +27,7 @@ import { startEmailWorker } from './email.worker'
 import { startOverdueCheckWorker } from './overdue-check.worker'
 import { startWhatsAppWorker } from './whatsapp.worker'
 import { startSMSWorker } from './sms.worker'
+import { startOutboxWorker } from './outbox.worker'
 import { registerAllEventHandlers } from '@/modules/events/event-registry'
 import { disconnectRedis } from '@/infrastructure/redis'
 import { logger } from '@/lib/logger'
@@ -48,9 +49,10 @@ async function main(): Promise<void> {
   const overdueCheckWorker = startOverdueCheckWorker(10)
   const whatsappWorker = startWhatsAppWorker()
   const smsWorker = startSMSWorker()
+  const outboxWorker = startOutboxWorker()
 
   log.info('All workers started successfully', {
-    workers: ['email', 'overdue-check', 'whatsapp', 'sms'],
+    workers: ['email', 'overdue-check', 'whatsapp', 'sms', 'outbox'],
   })
 
   // ─── Graceful Shutdown ─────────────────────────────────
@@ -70,6 +72,7 @@ async function main(): Promise<void> {
         overdueCheckWorker.close(),
         whatsappWorker.close(),
         smsWorker.close(),
+        outboxWorker.close(),
       ])
       log.info('Workers closed')
 

@@ -96,7 +96,7 @@ function getRedisConnection() {
     enableReadyCheck: false,
     retryStrategy(times) {
       const delay = Math.min(times * 200, 5e3);
-      log20.warn("Redis connection retry", { attempt: times, delayMs: delay });
+      log19.warn("Redis connection retry", { attempt: times, delayMs: delay });
       return delay;
     },
     reconnectOnError(err) {
@@ -105,13 +105,13 @@ function getRedisConnection() {
     }
   });
   redisInstance.on("connect", () => {
-    log20.info("Redis connected");
+    log19.info("Redis connected");
   });
   redisInstance.on("error", (err) => {
-    log20.error("Redis connection error", { error: err.message });
+    log19.error("Redis connection error", { error: err.message });
   });
   redisInstance.on("close", () => {
-    log20.warn("Redis connection closed");
+    log19.warn("Redis connection closed");
   });
   return redisInstance;
 }
@@ -125,13 +125,13 @@ async function checkRedisHealth() {
     return { status: "down", latencyMs: Date.now() - start };
   }
 }
-var import_ioredis, log20, redisInstance;
+var import_ioredis, log19, redisInstance;
 var init_redis = __esm({
   "src/infrastructure/redis.ts"() {
     "use strict";
     import_ioredis = __toESM(require("ioredis"));
     init_logger();
-    log20 = logger.child({ module: "redis" });
+    log19 = logger.child({ module: "redis" });
     redisInstance = null;
   }
 });
@@ -772,43 +772,40 @@ async function deleteClient(req, res) {
 }
 
 // src/lib/auth.ts
-var import_supabase_js = require("@supabase/supabase-js");
+var jwt = __toESM(require("jsonwebtoken"));
 init_logger();
 var log2 = logger.child({ module: "auth" });
-function getSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_ANON_KEY || "";
-  if (!url) {
-    log2.error("SUPABASE_URL is not set");
-    return null;
-  }
-  if (!key) {
-    log2.error("Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is set");
-    return null;
-  }
-  return (0, import_supabase_js.createClient)(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false }
-  });
-}
 async function verifyToken(token) {
   try {
-    const supabase = getSupabaseAdmin();
-    if (!supabase) return null;
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-    if (error || !user) {
-      log2.warn("Token verification failed", {
-        error: error?.message || "No user returned",
-        tokenPreview: token.substring(0, 20) + "..."
-      });
+    const secret = process.env.SUPABASE_JWT_SECRET;
+    if (!secret) {
+      log2.error("SUPABASE_JWT_SECRET is not set in environment variables");
       return null;
     }
+    const decoded = jwt.verify(token, secret);
+    if (!decoded || !decoded.sub) {
+      log2.warn("Token missing sub (userId) claim");
+      return null;
+    }
+    const userId = decoded.sub;
+    const email = decoded.email || "";
+    const role = decoded.role || "authenticated";
+    await prisma.user.upsert({
+      where: { id: userId },
+      update: { email },
+      // Ensure email stays in sync
+      create: {
+        id: userId,
+        email
+      }
+    });
     return {
-      userId: user.id,
-      email: user.email || "",
-      role: user.role || "authenticated"
+      userId,
+      email,
+      role
     };
   } catch (err) {
-    log2.error("Token verification error", {
+    log2.warn("Token verification failed", {
       error: err instanceof Error ? err.message : String(err)
     });
     return null;
@@ -873,127 +870,114 @@ var import_express2 = require("express");
 init_logger();
 var import_client4 = require("@prisma/client");
 
-// src/modules/events/event-bus.ts
-var import_events = require("events");
-init_logger();
-var log4 = logger.child({ module: "event-bus" });
-var TypedEventBus = class {
-  emitter;
-  constructor() {
-    this.emitter = new import_events.EventEmitter();
-    this.emitter.setMaxListeners(50);
-  }
-  /**
-   * Emit an event with a typed payload.
-   * All registered handlers execute asynchronously (fire-and-forget).
-   * Errors in handlers are caught and logged — they never crash the emitter.
-   */
-  emit(event, payload) {
-    log4.info("Event emitted", {
-      event,
-      invoiceId: "invoiceId" in payload ? payload.invoiceId : void 0
-    });
-    this.emitter.emit(event, payload);
-  }
-  /**
-   * Subscribe to an event with a typed handler.
-   * Handlers are wrapped with error catching to prevent unhandled rejections.
-   */
-  on(event, handler) {
-    this.emitter.on(event, async (payload) => {
-      try {
-        await handler(payload);
-      } catch (err) {
-        log4.error("Event handler error", {
-          event,
-          error: err instanceof Error ? err.message : String(err),
-          stack: err instanceof Error ? err.stack : void 0
-        });
-      }
-    });
-    log4.info("Event handler registered", { event });
-  }
-  /**
-   * Remove all listeners for an event (useful for testing).
-   */
-  removeAllListeners(event) {
-    if (event) {
-      this.emitter.removeAllListeners(event);
-    } else {
-      this.emitter.removeAllListeners();
-    }
-  }
-};
-var eventBus = new TypedEventBus();
-
 // src/modules/invoice/invoice.service.ts
 init_logger();
 var import_client3 = require("@prisma/client");
-var log5 = logger.child({ module: "invoice-service" });
+var log4 = logger.child({ module: "invoice-service" });
 async function createInvoice(data) {
-  const invoice = await prisma.invoice.create({
-    data: {
-      userId: data.userId,
-      clientId: data.clientId || null,
-      clientName: data.clientName,
-      clientEmail: data.clientEmail,
-      amount: new import_client3.Prisma.Decimal(data.amount.toFixed(2)),
-      dueDate: data.dueDate,
-      description: data.description || null,
-      whatsappNumber: data.whatsappNumber || null,
-      smsNumber: data.smsNumber || null,
-      chasingProfile: data.chasingProfile || import_client3.ChasingProfile.NORMAL,
-      contactChannel: data.contactChannel || import_client3.ContactChannel.EMAIL,
-      reminderTone: data.reminderTone || "PROFESSIONAL",
-      chaseUntilPaid: data.chaseUntilPaid || false,
-      paymentLink: {
-        create: {}
-      }
-    },
-    include: {
-      paymentLink: true
+  return prisma.$transaction(async (tx) => {
+    let clientId = data.clientId;
+    if (!clientId) {
+      const client = await tx.client.upsert({
+        where: {
+          userId_email: {
+            userId: data.userId,
+            email: data.clientEmail
+          }
+        },
+        update: {
+          name: data.clientName
+        },
+        create: {
+          userId: data.userId,
+          name: data.clientName,
+          email: data.clientEmail
+        }
+      });
+      clientId = client.id;
     }
+    const invoice = await tx.invoice.create({
+      data: {
+        userId: data.userId,
+        clientId: clientId || null,
+        clientName: data.clientName,
+        clientEmail: data.clientEmail,
+        amount: new import_client3.Prisma.Decimal(data.amount.toFixed(2)),
+        dueDate: data.dueDate,
+        description: data.description || null,
+        whatsappNumber: data.whatsappNumber || null,
+        smsNumber: data.smsNumber || null,
+        chasingProfile: data.chasingProfile || import_client3.ChasingProfile.NORMAL,
+        contactChannel: data.contactChannel || import_client3.ContactChannel.EMAIL,
+        reminderTone: data.reminderTone || "PROFESSIONAL",
+        chaseUntilPaid: data.chaseUntilPaid || false,
+        paymentLink: {
+          create: {}
+        }
+      },
+      include: {
+        paymentLink: true
+      }
+    });
+    const user = await tx.user.findUnique({
+      where: { id: data.userId },
+      select: { customIntervals: true }
+    });
+    log4.info("Invoice created", { invoiceId: invoice.id, userId: data.userId });
+    const payload = {
+      invoiceId: invoice.id,
+      userId: invoice.userId,
+      clientEmail: invoice.clientEmail,
+      clientName: invoice.clientName,
+      amount: invoice.amount.toString(),
+      // Preserve decimal precision
+      dueDate: invoice.dueDate,
+      whatsappNumber: invoice.whatsappNumber,
+      smsNumber: invoice.smsNumber,
+      chasingProfile: invoice.chasingProfile,
+      contactChannel: invoice.contactChannel,
+      paymentLinkToken: invoice.paymentLink?.token,
+      reminderTone: invoice.reminderTone,
+      chaseUntilPaid: invoice.chaseUntilPaid,
+      chaseIntervalDays: invoice.chaseIntervalDays,
+      customIntervals: user?.customIntervals
+    };
+    await tx.outboxEvent.create({
+      data: {
+        eventType: "invoice.created",
+        payload
+      }
+    });
+    return invoice;
   });
-  log5.info("Invoice created", { invoiceId: invoice.id, userId: data.userId });
-  const amount = invoice.amount instanceof import_client3.Prisma.Decimal ? invoice.amount.toNumber() : Number(invoice.amount);
-  eventBus.emit("invoice.created", {
-    invoiceId: invoice.id,
-    userId: invoice.userId,
-    clientEmail: invoice.clientEmail,
-    clientName: invoice.clientName,
-    amount,
-    dueDate: invoice.dueDate,
-    whatsappNumber: invoice.whatsappNumber,
-    smsNumber: invoice.smsNumber,
-    chasingProfile: invoice.chasingProfile,
-    contactChannel: invoice.contactChannel,
-    paymentLinkToken: invoice.paymentLink?.token,
-    reminderTone: invoice.reminderTone,
-    chaseUntilPaid: invoice.chaseUntilPaid,
-    chaseIntervalDays: invoice.chaseIntervalDays
-  });
-  return invoice;
 }
 async function markInvoiceAsPaid(invoiceId, userId) {
-  const result = await prisma.invoice.updateMany({
-    where: {
-      id: invoiceId,
-      userId,
-      status: "UNPAID"
-    },
-    data: {
-      status: "PAID",
-      reminderStage: 0,
-      updatedAt: /* @__PURE__ */ new Date()
+  return prisma.$transaction(async (tx) => {
+    const result = await tx.invoice.updateMany({
+      where: {
+        id: invoiceId,
+        userId,
+        status: "UNPAID"
+      },
+      data: {
+        status: "PAID",
+        reminderStage: 0,
+        updatedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    if (result.count === 0) {
+      log4.info("Invoice already paid or not found", { invoiceId, userId });
+      return null;
     }
+    log4.info("Invoice marked as paid", { invoiceId, userId });
+    await tx.outboxEvent.create({
+      data: {
+        eventType: "invoice.paid",
+        payload: { invoiceId, userId }
+      }
+    });
+    return tx.invoice.findUnique({ where: { id: invoiceId } });
   });
-  if (result.count === 0) {
-    log5.info("Invoice already paid or not found", { invoiceId, userId });
-    return null;
-  }
-  log5.info("Invoice marked as paid", { invoiceId, userId });
-  eventBus.emit("invoice.paid", { invoiceId, userId });
-  return prisma.invoice.findUnique({ where: { id: invoiceId } });
 }
 async function markInvoiceAsUnpaid(invoiceId, userId) {
   const result = await prisma.invoice.updateMany({
@@ -1008,29 +992,36 @@ async function markInvoiceAsUnpaid(invoiceId, userId) {
     }
   });
   if (result.count === 0) {
-    log5.info("Invoice already unpaid or not found", { invoiceId, userId });
+    log4.info("Invoice already unpaid or not found", { invoiceId, userId });
     return null;
   }
-  log5.info("Invoice marked as unpaid", { invoiceId, userId });
+  log4.info("Invoice marked as unpaid", { invoiceId, userId });
   return prisma.invoice.findUnique({ where: { id: invoiceId } });
 }
 async function deleteInvoice(invoiceId, userId) {
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: invoiceId, userId }
-  });
-  if (!invoice) {
-    return null;
-  }
-  if (invoice.status === "UNPAID") {
-    try {
-      eventBus.emit("invoice.paid", { invoiceId, userId });
-    } catch (err) {
-      log5.error("Failed to emit cleanup event before deletion", { invoiceId, error: err });
+  return prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, userId }
+    });
+    if (!invoice) {
+      return null;
     }
-  }
-  await prisma.invoice.delete({ where: { id: invoiceId } });
-  log5.info("Invoice deleted with job cleanup", { invoiceId, userId });
-  return invoice;
+    if (invoice.status === "UNPAID") {
+      try {
+        await tx.outboxEvent.create({
+          data: {
+            eventType: "invoice.paid",
+            payload: { invoiceId, userId }
+          }
+        });
+      } catch (err) {
+        log4.error("Failed to write cleanup event to outbox before deletion", { invoiceId, error: err });
+      }
+    }
+    await tx.invoice.delete({ where: { id: invoiceId } });
+    log4.info("Invoice deleted with job cleanup", { invoiceId, userId });
+    return invoice;
+  });
 }
 async function getInvoices(userId, options) {
   const skip = (options.page - 1) * options.limit;
@@ -1086,9 +1077,83 @@ async function updateInvoiceDetails(id, userId, updateData) {
     data: updateData
   });
 }
+async function sendManualReminder(invoiceId, userId) {
+  return prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, userId },
+      include: { paymentLink: true }
+    });
+    if (!invoice) throw new Error("Invoice not found");
+    if (invoice.status === "PAID") throw new Error("Cannot send reminder for a paid invoice");
+    const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (1e3 * 60 * 60 * 24)));
+    const nextStage = Math.max(1, invoice.reminderStage + 1);
+    const payload = {
+      invoiceId: invoice.id,
+      userId: invoice.userId,
+      clientEmail: invoice.clientEmail,
+      clientName: invoice.clientName,
+      amount: invoice.amount.toString(),
+      dueDate: invoice.dueDate,
+      daysOverdue,
+      stage: nextStage,
+      contactChannel: invoice.contactChannel,
+      whatsappNumber: invoice.whatsappNumber,
+      smsNumber: invoice.smsNumber,
+      paymentLinkToken: invoice.paymentLink?.token,
+      reminderTone: invoice.reminderTone,
+      chaseUntilPaid: invoice.chaseUntilPaid,
+      chaseIntervalDays: invoice.chaseIntervalDays
+    };
+    await tx.outboxEvent.create({
+      data: {
+        eventType: "invoice.overdue",
+        payload
+      }
+    });
+    await tx.invoiceEvent.create({
+      data: {
+        invoiceId,
+        eventType: "manual_reminder_queued",
+        metadata: { daysOverdue, stage: nextStage }
+      }
+    });
+    log4.info("Manual reminder queued", { invoiceId, nextStage });
+    return { success: true, channels: [], errors: [], message: "Reminder queued" };
+  });
+}
+async function getReminderHistory(invoiceId, userId) {
+  const invoice = await prisma.invoice.findFirst({
+    where: { id: invoiceId, userId },
+    select: { id: true }
+  });
+  if (!invoice) return null;
+  const reminders = await prisma.reminderLog.findMany({
+    where: { invoiceId },
+    orderBy: { sentAt: "desc" }
+  });
+  const trackings = await prisma.invoiceTracking.findMany({
+    where: { invoiceId },
+    orderBy: { createdAt: "desc" }
+  });
+  const events = await prisma.invoiceEvent.findMany({
+    where: {
+      invoiceId,
+      eventType: {
+        notIn: ["email_opened", "link_clicked", "payment_page_viewed"]
+      }
+    },
+    orderBy: { createdAt: "desc" }
+  });
+  const unifiedHistory = [];
+  reminders.forEach((r) => unifiedHistory.push({ ...r, _type: "reminder", _date: r.sentAt }));
+  trackings.forEach((t) => unifiedHistory.push({ ...t, _type: "tracking", _date: t.createdAt }));
+  events.forEach((e) => unifiedHistory.push({ ...e, _type: "event", _date: e.createdAt }));
+  unifiedHistory.sort((a, b) => b._date.getTime() - a._date.getTime());
+  return unifiedHistory;
+}
 
 // src/server/controllers/invoice.controller.ts
-var log6 = logger.child({ module: "invoice-controller" });
+var log5 = logger.child({ module: "invoice-controller" });
 async function getInvoices2(req, res) {
   try {
     const pagination = validateBody(paginationSchema, req.query);
@@ -1115,7 +1180,7 @@ async function getInvoices2(req, res) {
       }
     });
   } catch (error) {
-    log6.error("Get invoices error", { error: error instanceof Error ? error.message : String(error) });
+    log5.error("Get invoices error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1155,7 +1220,7 @@ async function createInvoiceHandler(req, res) {
     });
     res.status(201).json(invoice);
   } catch (error) {
-    log6.error("Create invoice error", { error: error instanceof Error ? error.message : String(error) });
+    log5.error("Create invoice error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1169,7 +1234,7 @@ async function getInvoice(req, res) {
     }
     res.json(invoice);
   } catch (error) {
-    log6.error("Get invoice error", { error: error instanceof Error ? error.message : String(error) });
+    log5.error("Get invoice error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1225,13 +1290,13 @@ async function updateInvoice(req, res) {
     if (data.status !== void 0) updateData.status = data.status;
     if (Object.keys(updateData).length > 0) {
       const invoice = await updateInvoiceDetails(id, req.user.userId, updateData);
-      log6.info("Invoice updated", { invoiceId: id, changes: Object.keys(updateData) });
+      log5.info("Invoice updated", { invoiceId: id, changes: Object.keys(updateData) });
       res.json(invoice);
       return;
     }
     res.json(existing);
   } catch (error) {
-    log6.error("Update invoice error", { error: error instanceof Error ? error.message : String(error) });
+    log5.error("Update invoice error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1245,7 +1310,50 @@ async function deleteInvoiceHandler(req, res) {
     }
     res.json({ message: "Invoice deleted" });
   } catch (error) {
-    log6.error("Delete invoice error", { error: error instanceof Error ? error.message : String(error) });
+    log5.error("Delete invoice error", { error: error instanceof Error ? error.message : String(error) });
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+async function sendReminderHandler(req, res) {
+  try {
+    const id = req.params.id;
+    const result = await sendManualReminder(id, req.user.userId);
+    if (!result.success) {
+      res.status(500).json({
+        error: "Failed to queue reminder",
+        details: result.errors
+      });
+      return;
+    }
+    res.status(202).json({
+      success: true,
+      message: result.message
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Internal server error";
+    log5.error("Send reminder error", { error: message });
+    if (message === "Invoice not found") {
+      res.status(404).json({ error: message });
+      return;
+    }
+    if (message.includes("paid invoice")) {
+      res.status(400).json({ error: message });
+      return;
+    }
+    res.status(500).json({ error: message });
+  }
+}
+async function getReminderHistoryHandler(req, res) {
+  try {
+    const id = req.params.id;
+    const history = await getReminderHistory(id, req.user.userId);
+    if (history === null) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+    res.json({ data: history });
+  } catch (error) {
+    log5.error("Get reminder history error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1258,6 +1366,8 @@ router2.post("/", createInvoiceHandler);
 router2.get("/:id", getInvoice);
 router2.put("/:id", updateInvoice);
 router2.delete("/:id", deleteInvoiceHandler);
+router2.post("/:id/remind", sendReminderHandler);
+router2.get("/:id/history", getReminderHistoryHandler);
 var invoice_routes_default = router2;
 
 // src/server/routes/dashboard.routes.ts
@@ -1265,7 +1375,7 @@ var import_express3 = require("express");
 
 // src/server/controllers/dashboard.controller.ts
 init_logger();
-var log7 = logger.child({ module: "dashboard-controller" });
+var log6 = logger.child({ module: "dashboard-controller" });
 async function getDashboard(req, res) {
   try {
     const now = /* @__PURE__ */ new Date();
@@ -1274,6 +1384,7 @@ async function getDashboard(req, res) {
       unpaidInvoices,
       overdueInvoices,
       totalPendingResult,
+      totalCollectedResult,
       recentInvoices
     ] = await Promise.all([
       prisma.invoice.count({
@@ -1287,6 +1398,10 @@ async function getDashboard(req, res) {
       }),
       prisma.invoice.aggregate({
         where: { userId: req.user.userId, status: "UNPAID" },
+        _sum: { amount: true }
+      }),
+      prisma.invoice.aggregate({
+        where: { userId: req.user.userId, status: "PAID" },
         _sum: { amount: true }
       }),
       prisma.invoice.findMany({
@@ -1308,7 +1423,8 @@ async function getDashboard(req, res) {
     const dueInvoices = unpaidInvoices - overdueInvoices;
     const toNumber = (val) => val ? parseFloat(val.toString()) : 0;
     const totalPendingAmount = toNumber(totalPendingResult._sum.amount);
-    log7.info("Dashboard query result", {
+    const totalCollectedAmount = toNumber(totalCollectedResult._sum.amount);
+    log6.info("Dashboard query result", {
       userId: req.user.userId,
       paidInvoices,
       dueInvoices: unpaidInvoices - overdueInvoices,
@@ -1321,10 +1437,11 @@ async function getDashboard(req, res) {
       dueInvoices,
       overdueInvoices,
       totalPendingAmount,
+      totalCollectedAmount,
       recentInvoices
     });
   } catch (error) {
-    log7.error("Dashboard error", { error: error instanceof Error ? error.message : String(error) });
+    log6.error("Dashboard error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -1343,7 +1460,7 @@ var import_googleapis = require("googleapis");
 // src/lib/encryption.ts
 var import_crypto = require("crypto");
 init_logger();
-var log8 = logger.child({ module: "encryption" });
+var log7 = logger.child({ module: "encryption" });
 var ALGORITHM = "aes-256-gcm";
 var IV_LENGTH = 16;
 var TAG_LENGTH = 16;
@@ -1353,7 +1470,7 @@ function getEncryptionKey() {
     if (process.env.NODE_ENV === "production") {
       throw new Error("ENCRYPTION_KEY must be a 64-character hex string in production");
     }
-    log8.warn("Using weak ENCRYPTION_KEY \u2014 set a strong key before deploying");
+    log7.warn("Using weak ENCRYPTION_KEY \u2014 set a strong key before deploying");
     return (0, import_crypto.scryptSync)("dev-only-insecure-encryption-key", "salt", 32);
   }
   return Buffer.from(key, "hex");
@@ -1387,7 +1504,7 @@ function decrypt(encryptedBase64) {
 
 // src/modules/communication/google-oauth.ts
 init_logger();
-var log9 = logger.child({ module: "google-oauth" });
+var log8 = logger.child({ module: "google-oauth" });
 var SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/userinfo.email"
@@ -1438,7 +1555,7 @@ async function handleOAuthCallback(code, userId) {
       metadata: { email, scope: tokens.scope }
     }
   });
-  log9.info("Google OAuth connected", { userId, email });
+  log8.info("Google OAuth connected", { userId, email });
   return { email };
 }
 async function getGmailClient(userId) {
@@ -1472,9 +1589,9 @@ async function getGmailClient(userId) {
         where: { userId_provider: { userId, provider: "google_oauth" } },
         data: updateData
       });
-      log9.info("Google OAuth tokens refreshed", { userId });
+      log8.info("Google OAuth tokens refreshed", { userId });
     } catch (err) {
-      log9.error("Failed to save refreshed tokens", {
+      log8.error("Failed to save refreshed tokens", {
         userId,
         error: err instanceof Error ? err.message : String(err)
       });
@@ -1504,10 +1621,10 @@ async function sendViaGmail(userId, to, subject, htmlBody, fromEmail) {
       userId: "me",
       requestBody: { raw: rawMessage }
     });
-    log9.info("Email sent via Gmail", { userId, to, subject });
+    log8.info("Email sent via Gmail", { userId, to, subject });
     return true;
   } catch (err) {
-    log9.error("Gmail send failed", {
+    log8.error("Gmail send failed", {
       userId,
       to,
       error: err instanceof Error ? err.message : String(err)
@@ -1529,7 +1646,7 @@ async function disconnectGoogle(userId) {
     await prisma.userCredential.delete({
       where: { userId_provider: { userId, provider: "google_oauth" } }
     });
-    log9.info("Google OAuth disconnected", { userId });
+    log8.info("Google OAuth disconnected", { userId });
   }
 }
 async function isGoogleConnected(userId) {
@@ -1547,7 +1664,7 @@ async function isGoogleConnected(userId) {
 // src/modules/communication/sms-sender.ts
 var import_twilio = __toESM(require("twilio"));
 init_logger();
-var log10 = logger.child({ module: "sms-sender" });
+var log9 = logger.child({ module: "sms-sender" });
 async function connectTwilio(userId, accountSid, authToken, phoneNumber) {
   try {
     const client = (0, import_twilio.default)(accountSid, authToken);
@@ -1574,14 +1691,14 @@ async function connectTwilio(userId, accountSid, authToken, phoneNumber) {
       metadata: { phoneNumber }
     }
   });
-  log10.info("Twilio connected", { userId, phoneNumber });
+  log9.info("Twilio connected", { userId, phoneNumber });
   return { success: true };
 }
 async function disconnectTwilio(userId) {
   await prisma.userCredential.deleteMany({
     where: { userId, provider: "twilio" }
   });
-  log10.info("Twilio disconnected", { userId });
+  log9.info("Twilio disconnected", { userId });
 }
 async function isTwilioConnected(userId) {
   const credential = await prisma.userCredential.findUnique({
@@ -1599,7 +1716,7 @@ async function isTwilioConnected(userId) {
 
 // src/server/controllers/settings.controller.ts
 init_logger();
-var log11 = logger.child({ module: "settings-controller" });
+var log10 = logger.child({ module: "settings-controller" });
 async function getConnectionStatus(req, res) {
   try {
     const userId = req.user.userId;
@@ -1609,11 +1726,43 @@ async function getConnectionStatus(req, res) {
     ]);
     res.json({ google: google2, twilio });
   } catch (error) {
-    log11.error("Failed to get connection status", {
+    log10.error("Failed to get connection status", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
     res.status(500).json({ error: "Failed to get connection status" });
+  }
+}
+async function getPreferences(req, res) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true }
+    });
+    res.json(user);
+  } catch (error) {
+    log10.error("Failed to get preferences", {
+      userId: req.user.userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    res.status(500).json({ error: "Failed to get preferences" });
+  }
+}
+async function updatePreferences(req, res) {
+  try {
+    const { customIntervals, chaseIntervalDays, chaseUntilPaid } = req.body;
+    const user = await prisma.user.update({
+      where: { id: req.user.userId },
+      data: { customIntervals, chaseIntervalDays, chaseUntilPaid },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true }
+    });
+    res.json(user);
+  } catch (error) {
+    log10.error("Failed to update preferences", {
+      userId: req.user.userId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+    res.status(500).json({ error: "Failed to update preferences" });
   }
 }
 async function getEmailAuthUrl(req, res) {
@@ -1621,7 +1770,7 @@ async function getEmailAuthUrl(req, res) {
     const url = getAuthorizationUrl(req.user.userId);
     res.json({ url });
   } catch (error) {
-    log11.error("Failed to generate auth url", {
+    log10.error("Failed to generate auth url", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -1642,7 +1791,7 @@ async function connectEmail(req, res) {
       email
     });
   } catch (error) {
-    log11.error("OAuth callback failed", {
+    log10.error("OAuth callback failed", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -1654,7 +1803,7 @@ async function disconnectEmail(req, res) {
     await disconnectGoogle(req.user.userId);
     res.json({ success: true, message: "Email disconnected successfully" });
   } catch (error) {
-    log11.error("Failed to disconnect Google OAuth", {
+    log10.error("Failed to disconnect Google OAuth", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -1678,7 +1827,7 @@ async function connectSms(req, res) {
       message: "Twilio connected successfully"
     });
   } catch (error) {
-    log11.error("Twilio connect failed", {
+    log10.error("Twilio connect failed", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -1690,7 +1839,7 @@ async function disconnectSms(req, res) {
     await disconnectTwilio(req.user.userId);
     res.json({ success: true, message: "Twilio disconnected successfully" });
   } catch (error) {
-    log11.error("Failed to disconnect Twilio", {
+    log10.error("Failed to disconnect Twilio", {
       userId: req.user.userId,
       error: error instanceof Error ? error.message : String(error)
     });
@@ -1698,7 +1847,7 @@ async function disconnectSms(req, res) {
   }
 }
 async function googleOAuthCallback(req, res) {
-  const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   try {
     const code = req.query.code;
     const userId = req.query.state;
@@ -1707,10 +1856,10 @@ async function googleOAuthCallback(req, res) {
       return;
     }
     const { email } = await handleOAuthCallback(code, userId);
-    log11.info("Google OAuth callback successful", { userId, email });
+    log10.info("Google OAuth callback successful", { userId, email });
     res.redirect(`${frontendUrl}/settings?google_connected=true&email=${encodeURIComponent(email)}`);
   } catch (error) {
-    log11.error("Google OAuth callback failed", {
+    log10.error("Google OAuth callback failed", {
       error: error instanceof Error ? error.message : String(error)
     });
     res.redirect(`${frontendUrl}/settings?error=oauth_failed`);
@@ -1722,6 +1871,8 @@ var router4 = (0, import_express4.Router)();
 router4.get("/google/callback", googleOAuthCallback);
 router4.use(authMiddleware);
 router4.get("/status", getConnectionStatus);
+router4.get("/preferences", getPreferences);
+router4.put("/preferences", updatePreferences);
 router4.get("/email/connect", getEmailAuthUrl);
 router4.post("/email/connect", connectEmail);
 router4.delete("/email/disconnect", disconnectEmail);
@@ -1761,7 +1912,7 @@ async function setSetting(key, value) {
 
 // src/server/controllers/admin.controller.ts
 init_logger();
-var log12 = logger.child({ module: "admin-controller" });
+var log11 = logger.child({ module: "admin-controller" });
 async function getSettings(_req, res) {
   try {
     const apiKey = await getSetting("GEMINI_API_KEY", "");
@@ -1769,7 +1920,7 @@ async function getSettings(_req, res) {
     const generatorModel = await getSetting("GEMINI_GENERATOR_MODEL", "gemini-2.0-flash");
     res.json({ apiKey, parserModel, generatorModel });
   } catch (error) {
-    log12.error("Get settings error", { error: error instanceof Error ? error.message : String(error) });
+    log11.error("Get settings error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to fetch settings" });
   }
 }
@@ -1787,7 +1938,7 @@ async function updateSettings(req, res) {
     }
     res.json({ success: true });
   } catch (error) {
-    log12.error("Update settings error", { error: error instanceof Error ? error.message : String(error) });
+    log11.error("Update settings error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to update settings" });
   }
 }
@@ -1811,7 +1962,7 @@ async function listModels(req, res) {
     }));
     res.json({ success: true, models: validModels });
   } catch (error) {
-    log12.error("List models error", { error: error instanceof Error ? error.message : String(error) });
+    log11.error("List models error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to authenticate and detect models" });
   }
 }
@@ -1829,7 +1980,7 @@ async function listUsers(req, res) {
     });
     res.json({ success: true, users });
   } catch (error) {
-    log12.error("List users error", { error: error instanceof Error ? error.message : String(error) });
+    log11.error("List users error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to list users" });
   }
 }
@@ -1847,18 +1998,18 @@ async function updateUserTier(req, res) {
     });
     res.json({ success: true });
   } catch (error) {
-    log12.error("Update user tier error", { error: error instanceof Error ? error.message : String(error) });
+    log11.error("Update user tier error", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to update user tier" });
   }
 }
 
 // src/server/middleware/admin.ts
 init_logger();
-var log13 = logger.child({ module: "admin-middleware" });
+var log12 = logger.child({ module: "admin-middleware" });
 function adminMiddleware(req, res, next) {
   const adminKey = process.env.ADMIN_API_KEY;
   if (!adminKey) {
-    log13.error("ADMIN_API_KEY is not configured");
+    log12.error("ADMIN_API_KEY is not configured");
     res.status(500).json({ error: "Admin access not configured" });
     return;
   }
@@ -1886,7 +2037,7 @@ var import_express6 = require("express");
 // src/modules/communication/email-sender.ts
 var import_nodemailer = __toESM(require("nodemailer"));
 init_logger();
-var log14 = logger.child({ module: "email-sender" });
+var log13 = logger.child({ module: "email-sender" });
 async function sendEmail(options) {
   const { userId, to, subject, htmlBody, trackingPixelUrl } = options;
   let finalHtml = htmlBody;
@@ -1898,11 +2049,11 @@ async function sendEmail(options) {
     try {
       const success = await sendViaGmail(userId, to, subject, finalHtml);
       if (success) {
-        log14.info("Email sent via Gmail", { userId, to, subject });
+        log13.info("Email sent via Gmail", { userId, to, subject });
         return { success: true, channel: "gmail" };
       }
     } catch (err) {
-      log14.warn("Gmail send failed, falling back to SMTP", {
+      log13.warn("Gmail send failed, falling back to SMTP", {
         userId,
         error: err instanceof Error ? err.message : String(err)
       });
@@ -1910,11 +2061,11 @@ async function sendEmail(options) {
   }
   try {
     await sendViaSMTP(to, subject, finalHtml, options.plainText);
-    log14.info("Email sent via SMTP", { userId, to, subject });
+    log13.info("Email sent via SMTP", { userId, to, subject });
     return { success: true, channel: "smtp" };
   } catch (err) {
     const errorMsg = err instanceof Error ? err.message : String(err);
-    log14.error("SMTP send failed", { userId, to, error: errorMsg });
+    log13.error("SMTP send failed", { userId, to, error: errorMsg });
     return { success: false, channel: "smtp", error: errorMsg };
   }
 }
@@ -1952,7 +2103,7 @@ function injectTrackingPixel(html, pixelUrl) {
 
 // src/modules/payment/payment.service.ts
 init_logger();
-var log15 = logger.child({ module: "payment-service" });
+var log14 = logger.child({ module: "payment-service" });
 async function getPaymentLinkAndTrackView(token) {
   const paymentLink = await prisma.paymentLink.findUnique({
     where: { token },
@@ -1993,7 +2144,7 @@ async function getPaymentLinkAndTrackView(token) {
         }
       });
     } catch (err) {
-      log15.error("Failed to track payment page view", { token });
+      log14.error("Failed to track payment page view", { token });
     }
   });
   return paymentLink;
@@ -2039,13 +2190,13 @@ async function processPaymentNotification(token) {
     htmlBody,
     plainText: `${invoice.clientName} indicated they paid invoice ${invoice.invoiceNumber}. Please verify and mark as paid in the dashboard.`
   });
-  log15.info("Client notified paid", { invoiceId: invoice.id, token });
+  log14.info("Client notified paid", { invoiceId: invoice.id, token });
   return { success: true, invoiceId: invoice.id };
 }
 
 // src/server/controllers/payment.controller.ts
 init_logger();
-var log16 = logger.child({ module: "payment-controller" });
+var log15 = logger.child({ module: "payment-controller" });
 async function getPaymentLink(req, res) {
   try {
     const token = req.params.token;
@@ -2066,7 +2217,7 @@ async function getPaymentLink(req, res) {
       user: invoice.user
     });
   } catch (err) {
-    log16.error("Failed to get payment link", {
+    log15.error("Failed to get payment link", {
       error: err instanceof Error ? err.message : String(err)
     });
     res.status(500).json({ error: "Internal server error" });
@@ -2087,7 +2238,7 @@ async function notifyPayment(req, res) {
       res.status(400).json({ error: errorMessage });
       return;
     }
-    log16.error("Failed to process payment notification", { error: errorMessage });
+    log15.error("Failed to process payment notification", { error: errorMessage });
     res.status(500).json({ error: "Internal server error" });
   }
 }
@@ -2103,7 +2254,7 @@ var import_express7 = require("express");
 
 // src/server/controllers/tracking.controller.ts
 init_logger();
-var log17 = logger.child({ module: "tracking-controller" });
+var log16 = logger.child({ module: "tracking-controller" });
 var TRANSPARENT_GIF_BASE64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 var pixelBuffer = Buffer.from(TRANSPARENT_GIF_BASE64, "base64");
 async function trackEmailOpen(req, res) {
@@ -2112,7 +2263,7 @@ async function trackEmailOpen(req, res) {
   if (invoiceId) {
     try {
       trackOpen(invoiceId, stage, req).catch((err) => {
-        log17.error("Failed to log tracking event", {
+        log16.error("Failed to log tracking event", {
           invoiceId,
           error: err instanceof Error ? err.message : String(err)
         });
@@ -2144,7 +2295,7 @@ async function trackOpen(invoiceId, stage, req) {
       metadata: { stage: stage ? parseInt(stage) : null, channel: "email" }
     }
   });
-  log17.info("Email open tracked", { invoiceId, stage });
+  log16.info("Email open tracked", { invoiceId, stage });
 }
 
 // src/server/routes/tracking.routes.ts
@@ -2159,7 +2310,7 @@ var import_multer = __toESM(require("multer"));
 // src/modules/ai/parser.ts
 var import_generative_ai = require("@google/generative-ai");
 init_logger();
-var log18 = logger.child({ module: "ai-parser" });
+var log17 = logger.child({ module: "ai-parser" });
 var invoiceSchema = {
   type: "OBJECT",
   properties: {
@@ -2227,10 +2378,10 @@ ${textContent.substring(0, 5e3)} // limit to 5000 chars to avoid token limits on
       } catch (e) {
       }
     }
-    log18.info("Successfully parsed invoice", { confidenceScore: parsed.confidenceScore });
+    log17.info("Successfully parsed invoice", { confidenceScore: parsed.confidenceScore });
     return parsed;
   } catch (error) {
-    log18.error("Failed to parse invoice with AI", { error: error instanceof Error ? error.message : String(error) });
+    log17.error("Failed to parse invoice with AI", { error: error instanceof Error ? error.message : String(error) });
     throw new Error("Failed to extract invoice data");
   }
 }
@@ -2239,7 +2390,7 @@ ${textContent.substring(0, 5e3)} // limit to 5000 chars to avoid token limits on
 init_logger();
 var import_sync = require("csv-parse/sync");
 var pdf = require("pdf-parse");
-var log19 = logger.child({ module: "upload-controller" });
+var log18 = logger.child({ module: "upload-controller" });
 async function uploadFile(req, res) {
   try {
     const file = req.file;
@@ -2247,7 +2398,7 @@ async function uploadFile(req, res) {
       res.status(400).json({ error: "No file provided" });
       return;
     }
-    log19.info("Received file for parsing", {
+    log18.info("Received file for parsing", {
       filename: file.originalname,
       size: file.size,
       type: file.mimetype
@@ -2275,7 +2426,7 @@ async function uploadFile(req, res) {
     const parsedData = await parseInvoiceContent(extractedText);
     res.json({ success: true, data: parsedData });
   } catch (error) {
-    log19.error("Upload processing failed", { error: error instanceof Error ? error.message : String(error) });
+    log18.error("Upload processing failed", { error: error instanceof Error ? error.message : String(error) });
     res.status(500).json({ error: "Failed to process file. Please try manual entry." });
   }
 }
@@ -2295,7 +2446,7 @@ var import_express9 = require("express");
 // src/server/controllers/health.controller.ts
 init_redis();
 init_logger();
-var log21 = logger.child({ module: "health-controller" });
+var log20 = logger.child({ module: "health-controller" });
 async function getHealth(_req, res) {
   const start = Date.now();
   try {
@@ -2321,7 +2472,7 @@ async function getHealth(_req, res) {
       }
     });
   } catch (error) {
-    log21.error("Health check failed", {
+    log20.error("Health check failed", {
       error: error instanceof Error ? error.message : String(error)
     });
     res.status(503).json({
@@ -2347,10 +2498,10 @@ var import_express10 = require("express");
 var import_lemonsqueezy = require("@lemonsqueezy/lemonsqueezy.js");
 init_logger();
 var import_crypto2 = __toESM(require("crypto"));
-var log22 = logger.child({ module: "billing.controller" });
+var log21 = logger.child({ module: "billing.controller" });
 (0, import_lemonsqueezy.lemonSqueezySetup)({
   apiKey: process.env.LEMON_SQUEEZY_API_KEY || "",
-  onError: (error) => log22.error("Lemon Squeezy API Error", { error })
+  onError: (error) => log21.error("Lemon Squeezy API Error", { error })
 });
 var STORE_ID = process.env.LEMON_SQUEEZY_STORE_ID || "";
 var PRO_VARIANT_ID = process.env.LEMON_SQUEEZY_PRO_VARIANT_ID || "";
@@ -2392,13 +2543,13 @@ var getCheckoutUrl = async (req, res) => {
     };
     const { data, error } = await (0, import_lemonsqueezy.createCheckout)(STORE_ID, PRO_VARIANT_ID, newCheckout);
     if (error || !data) {
-      log22.error("Failed to create checkout", { error });
+      log21.error("Failed to create checkout", { error });
       res.status(500).json({ error: "Failed to create checkout session" });
       return;
     }
     res.json({ checkoutUrl: data.data.attributes.url });
   } catch (error) {
-    log22.error("Checkout creation error", { error });
+    log21.error("Checkout creation error", { error });
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2416,13 +2567,13 @@ var getCustomerPortalUrl = async (req, res) => {
     }
     const { data, error } = await (0, import_lemonsqueezy.getCustomer)(user.lemonSqueezyCustomerId);
     if (error || !data) {
-      log22.error("Failed to get customer portal", { error });
+      log21.error("Failed to get customer portal", { error });
       res.status(500).json({ error: "Failed to retrieve customer portal" });
       return;
     }
     res.json({ portalUrl: data.data.attributes.urls.customer_portal });
   } catch (error) {
-    log22.error("Customer portal error", { error });
+    log21.error("Customer portal error", { error });
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2459,7 +2610,7 @@ var handleWebhook = async (req, res) => {
     const digest = Buffer.from(hmac.update(rawBody).digest("hex"), "utf8");
     const signatureBuffer = Buffer.from(signature, "utf8");
     if (digest.length !== signatureBuffer.length || !import_crypto2.default.timingSafeEqual(digest, signatureBuffer)) {
-      log22.warn("Invalid webhook signature");
+      log21.warn("Invalid webhook signature");
       res.status(401).json({ error: "Invalid signature" });
       return;
     }
@@ -2467,7 +2618,7 @@ var handleWebhook = async (req, res) => {
     const eventName = body.meta.event_name;
     const obj = body.data.attributes;
     const customData = body.meta.custom_data;
-    log22.info("Received Lemon Squeezy Webhook", { eventName });
+    log21.info("Received Lemon Squeezy Webhook", { eventName });
     if (eventName === "subscription_created" || eventName === "subscription_updated") {
       const userId = customData?.user_id;
       if (userId) {
@@ -2496,7 +2647,7 @@ var handleWebhook = async (req, res) => {
     }
     res.status(200).send("OK");
   } catch (error) {
-    log22.error("Webhook error", { error });
+    log21.error("Webhook error", { error });
     res.status(500).json({ error: "Internal server error" });
   }
 };
@@ -2525,9 +2676,9 @@ var routes_default = apiRouter;
 
 // src/server/middleware/error-handler.ts
 init_logger();
-var log23 = logger.child({ module: "error-handler" });
+var log22 = logger.child({ module: "error-handler" });
 function errorHandler(err, req, res, _next) {
-  log23.error("Unhandled error", {
+  log22.error("Unhandled error", {
     method: req.method,
     path: req.path,
     error: err.message,
@@ -2547,7 +2698,7 @@ function errorHandler(err, req, res, _next) {
 // src/lib/rate-limit.ts
 init_redis();
 init_logger();
-var log24 = logger.child({ module: "rate-limiter" });
+var log23 = logger.child({ module: "rate-limiter" });
 async function checkRateLimit(key, limit, windowSeconds) {
   try {
     const redis = getRedisConnection();
@@ -2564,7 +2715,7 @@ async function checkRateLimit(key, limit, windowSeconds) {
     const allowed = count <= limit;
     const remaining = Math.max(0, limit - count);
     if (!allowed) {
-      log24.warn("Rate limit exceeded", { key, count, limit, windowSeconds });
+      log23.warn("Rate limit exceeded", { key, count, limit, windowSeconds });
     }
     return {
       allowed,
@@ -2572,7 +2723,7 @@ async function checkRateLimit(key, limit, windowSeconds) {
       resetInSeconds: windowSeconds
     };
   } catch (err) {
-    log24.error("Rate limit check failed, allowing request", {
+    log23.error("Rate limit check failed, allowing request", {
       key,
       error: err instanceof Error ? err.message : String(err)
     });
@@ -2608,6 +2759,59 @@ async function globalRateLimiter(req, res, next) {
   next();
 }
 
+// src/modules/events/event-bus.ts
+var import_events = require("events");
+init_logger();
+var log24 = logger.child({ module: "event-bus" });
+var TypedEventBus = class {
+  emitter;
+  constructor() {
+    this.emitter = new import_events.EventEmitter();
+    this.emitter.setMaxListeners(50);
+  }
+  /**
+   * Emit an event with a typed payload.
+   * All registered handlers execute asynchronously (fire-and-forget).
+   * Errors in handlers are caught and logged — they never crash the emitter.
+   */
+  emit(event, payload) {
+    log24.info("Event emitted", {
+      event,
+      invoiceId: "invoiceId" in payload ? payload.invoiceId : void 0
+    });
+    this.emitter.emit(event, payload);
+  }
+  /**
+   * Subscribe to an event with a typed handler.
+   * Handlers are wrapped with error catching to prevent unhandled rejections.
+   */
+  on(event, handler) {
+    this.emitter.on(event, async (payload) => {
+      try {
+        await handler(payload);
+      } catch (err) {
+        log24.error("Event handler error", {
+          event,
+          error: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : void 0
+        });
+      }
+    });
+    log24.info("Event handler registered", { event });
+  }
+  /**
+   * Remove all listeners for an event (useful for testing).
+   */
+  removeAllListeners(event) {
+    if (event) {
+      this.emitter.removeAllListeners(event);
+    } else {
+      this.emitter.removeAllListeners();
+    }
+  }
+};
+var eventBus = new TypedEventBus();
+
 // src/modules/notification/notification.subscriber.ts
 init_email_queue();
 
@@ -2619,31 +2823,59 @@ var log27 = logger.child({ module: "overdue-check-queue" });
 function getOverdueCheckQueue() {
   return createQueue(QUEUE_NAMES.OVERDUE_CHECK);
 }
+function calculateOptimalDeliveryTime(targetDate) {
+  const date = new Date(targetDate);
+  const day = date.getUTCDay();
+  const hours = date.getUTCHours();
+  let shiftDays = 0;
+  if (day === 5 && hours >= 17) {
+    shiftDays = 4;
+  } else if (day === 6) {
+    shiftDays = 3;
+  } else if (day === 0) {
+    shiftDays = 2;
+  }
+  if (shiftDays > 0) {
+    date.setUTCDate(date.getUTCDate() + shiftDays);
+    date.setUTCHours(10, 0, 0, 0);
+  }
+  return date;
+}
 async function scheduleOverdueChecks(data) {
   const queue = getOverdueCheckQueue();
   let checkpoints = [];
-  if (data.chasingProfile === "STRICT") {
+  if (data.customIntervals && typeof data.customIntervals === "object") {
+    const { stage2Days, stage3Days, stage4Days } = data.customIntervals;
     checkpoints = [
-      { daysOverdue: 1, stage: 2 },
-      { daysOverdue: 3, stage: 3 },
-      { daysOverdue: 5, stage: 4 }
-    ];
-  } else if (data.chasingProfile === "RELAXED") {
-    checkpoints = [
-      { daysOverdue: 7, stage: 2 },
-      { daysOverdue: 14, stage: 3 },
-      { daysOverdue: 30, stage: 4 }
+      { daysOverdue: Number(stage2Days) || 3, stage: 2 },
+      { daysOverdue: Number(stage3Days) || 7, stage: 3 },
+      { daysOverdue: Number(stage4Days) || 14, stage: 4 }
     ];
   } else {
-    checkpoints = [
-      { daysOverdue: 3, stage: 2 },
-      { daysOverdue: 7, stage: 3 },
-      { daysOverdue: 14, stage: 4 }
-    ];
+    if (data.chasingProfile === "STRICT") {
+      checkpoints = [
+        { daysOverdue: 1, stage: 2 },
+        { daysOverdue: 3, stage: 3 },
+        { daysOverdue: 5, stage: 4 }
+      ];
+    } else if (data.chasingProfile === "RELAXED") {
+      checkpoints = [
+        { daysOverdue: 7, stage: 2 },
+        { daysOverdue: 14, stage: 3 },
+        { daysOverdue: 30, stage: 4 }
+      ];
+    } else {
+      checkpoints = [
+        { daysOverdue: 3, stage: 2 },
+        { daysOverdue: 7, stage: 3 },
+        { daysOverdue: 14, stage: 4 }
+      ];
+    }
   }
   for (const checkpoint of checkpoints) {
     const jobId = `overdue:${data.invoiceId}:day:${checkpoint.daysOverdue}`;
-    const targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1e3);
+    let targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1e3);
+    targetTime = calculateOptimalDeliveryTime(targetTime);
     const delayMs = Math.max(0, targetTime.getTime() - Date.now());
     try {
       await queue.add(
@@ -2793,7 +3025,8 @@ async function onInvoiceCreated(event) {
     paymentLinkToken: event.paymentLinkToken,
     reminderTone: event.reminderTone,
     chaseUntilPaid: event.chaseUntilPaid,
-    chaseIntervalDays: event.chaseIntervalDays
+    chaseIntervalDays: event.chaseIntervalDays,
+    customIntervals: event.customIntervals
   });
   log30.info("All jobs scheduled for new invoice", {
     invoiceId: event.invoiceId,
@@ -2980,7 +3213,7 @@ app.use((0, import_helmet.default)({
   contentSecurityPolicy: false
 }));
 app.use((0, import_cors.default)({
-  origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   credentials: true
 }));
 app.use(import_express12.default.json({
@@ -3009,11 +3242,36 @@ app.use((req, res, next) => {
 app.use("/api", routes_default);
 app.use(errorHandler);
 registerAllEventHandlers();
-app.listen(PORT, () => {
+var server = app.listen(PORT, () => {
   log33.info(`Express API server running on port ${PORT}`, {
     port: PORT,
     env: process.env.NODE_ENV || "development",
     pid: process.pid
   });
 });
+var isShuttingDown = false;
+async function shutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  log33.info(`Received ${signal}, shutting down gracefully...`);
+  server.close(async (err) => {
+    if (err) {
+      log33.error("Error closing HTTP server", { error: err.message });
+    } else {
+      log33.info("HTTP server closed");
+    }
+    try {
+      await prisma.$disconnect();
+      log33.info("Database connections closed");
+      process.exit(0);
+    } catch (dbErr) {
+      log33.error("Error disconnecting database", {
+        error: dbErr instanceof Error ? dbErr.message : String(dbErr)
+      });
+      process.exit(1);
+    }
+  });
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 var server_default = app;

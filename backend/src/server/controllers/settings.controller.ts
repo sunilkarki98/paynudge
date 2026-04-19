@@ -31,7 +31,7 @@ export async function getPreferences(req: Request, res: Response): Promise<void>
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
-      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true, shieldMode: true },
     })
     res.json(user)
   } catch (error) {
@@ -47,11 +47,11 @@ export async function getPreferences(req: Request, res: Response): Promise<void>
 
 export async function updatePreferences(req: Request, res: Response): Promise<void> {
   try {
-    const { customIntervals, chaseIntervalDays, chaseUntilPaid } = req.body
+    const { customIntervals, chaseIntervalDays, chaseUntilPaid, shieldMode } = req.body
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { customIntervals, chaseIntervalDays, chaseUntilPaid },
-      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true },
+      data: { customIntervals, chaseIntervalDays, chaseUntilPaid, shieldMode },
+      select: { customIntervals: true, chaseIntervalDays: true, chaseUntilPaid: true, shieldMode: true },
     })
     res.json(user)
   } catch (error) {
@@ -171,7 +171,7 @@ export async function disconnectSms(req: Request, res: Response): Promise<void> 
 // It does NOT have a JWT — the userId comes via the `state` param.
 
 export async function googleOAuthCallback(req: Request, res: Response): Promise<void> {
-  const frontendUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const frontendUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
   try {
     const code = req.query.code as string

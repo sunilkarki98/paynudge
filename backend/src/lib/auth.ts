@@ -1,31 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import * as jwt from 'jsonwebtoken'
 import { logger } from './logger'
 
 const log = logger.child({ module: 'auth' })
-
-/**
- * Supabase Admin client for server-side token verification.
- * Uses the service role key for admin access, or falls back to
- * direct JWT verification via Supabase's getUser() method.
- */
-function getSupabaseAdmin() {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_ANON_KEY || ''
-
-  if (!url) {
-    log.error('SUPABASE_URL is not set')
-    return null
-  }
-
-  if (!key) {
-    log.error('Neither SUPABASE_SERVICE_ROLE_KEY nor SUPABASE_ANON_KEY is set')
-    return null
-  }
-
-  return createClient(url, key, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
-}
 
 export interface JWTPayload {
   userId: string
@@ -34,32 +10,38 @@ export interface JWTPayload {
 }
 
 /**
- * Verify a Supabase access token by calling Supabase's getUser() API.
- * This works with any signing algorithm (HS256, ES256, etc.)
- * because Supabase validates the token server-side.
+ * Verify a Supabase access token locally using jsonwebtoken.
+ * This eliminates the ~200ms network penalty of calling Supabase APIs.
  */
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const supabase = getSupabaseAdmin()
-    if (!supabase) return null
-
-    const { data: { user }, error } = await supabase.auth.getUser(token)
-
-    if (error || !user) {
-      log.warn('Token verification failed', {
-        error: error?.message || 'No user returned',
-        tokenPreview: token.substring(0, 20) + '...',
-      })
+    const secret = process.env.SUPABASE_JWT_SECRET
+    if (!secret) {
+      log.error('SUPABASE_JWT_SECRET is not set in environment variables')
       return null
     }
 
+    // Supabase JWTs use HS256. If the token is invalid or expired, this will throw.
+    const decoded = jwt.verify(token, secret) as any
+
+    if (!decoded || !decoded.sub) {
+      log.warn('Token missing sub (userId) claim')
+      return null
+    }
+
+    const userId = decoded.sub
+    const email = decoded.email || ''
+    const role = decoded.role || 'authenticated'
+
+
+
     return {
-      userId: user.id,
-      email: user.email || '',
-      role: user.role || 'authenticated',
+      userId,
+      email,
+      role,
     }
   } catch (err) {
-    log.error('Token verification error', {
+    log.warn('Token verification failed', {
       error: err instanceof Error ? err.message : String(err),
     })
     return null

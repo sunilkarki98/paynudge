@@ -21,15 +21,30 @@ interface Invoice {
   createdAt: string
 }
 
-interface ReminderLog {
+interface HistoryEvent {
   id: string
-  stage: number
-  status: string
-  channel: string | null
-  tone: string | null
-  messageBody: string | null
-  error: string | null
-  sentAt: string
+  _type: 'reminder' | 'tracking' | 'event'
+  _date: string
+
+  // Reminder fields
+  stage?: number
+  status?: string
+  channel?: string | null
+  tone?: string | null
+  messageBody?: string | null
+  persuasionStrategy?: string | null
+  error?: string | null
+  sentAt?: string
+
+  // Tracking fields
+  event?: string
+  
+  // Event fields
+  eventType?: string
+  
+  // Shared Tracking/Event fields
+  metadata?: any
+  createdAt?: string
 }
 
 interface Client {
@@ -70,7 +85,7 @@ export default function InvoicesPage() {
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const [reminderFeedback, setReminderFeedback] = useState<{ id: string; type: 'success' | 'error'; message: string } | null>(null)
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null)
-  const [historyData, setHistoryData] = useState<ReminderLog[]>([])
+  const [historyData, setHistoryData] = useState<HistoryEvent[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const fetchInvoices = useCallback(async () => {
@@ -254,7 +269,7 @@ export default function InvoicesPage() {
                 <th className="px-6 py-4 font-bold">Amount</th>
                 <th className="px-6 py-4 font-bold">Due Date</th>
                 <th className="px-6 py-4 font-bold">Status</th>
-                <th className="px-6 py-4 font-bold">Reminders</th>
+                <th className="px-6 py-4 font-bold">Nudges</th>
                 <th className="px-6 py-4 font-bold text-right">Actions</th>
               </tr>
             </thead>
@@ -312,8 +327,8 @@ export default function InvoicesPage() {
                             <button
                               onClick={() => handleSendReminder(invoice)}
                               disabled={sendingReminderId === invoice.id}
-                              className="p-2 rounded-xl text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 disabled:opacity-50 transition-colors"
-                              title="Send reminder now"
+                              className="p-2 rounded-xl text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 disabled:opacity-50 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
+                              title="Trigger strategic nudge now"
                             >
                               {sendingReminderId === invoice.id ? (
                                 <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -341,8 +356,8 @@ export default function InvoicesPage() {
                         {/* View History */}
                         <button
                           onClick={() => handleViewHistory(invoice)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-primary-600 hover:bg-primary-500/15 transition-colors"
-                          title="View reminder history"
+                          className="p-2 rounded-xl text-text-secondary hover:text-primary-600 hover:bg-primary-500/15 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
+                          title="View strategic intelligence log"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -350,7 +365,7 @@ export default function InvoicesPage() {
                         </button>
                         <button
                           onClick={() => handleToggleStatus(invoice)}
-                          className={`p-2 rounded-xl transition-colors ${
+                          className={`p-2 rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5 ${
                             isPaid
                               ? 'text-amber-600 hover:bg-amber-500/15 hover:text-amber-700'
                               : 'text-emerald-600 hover:bg-emerald-500/15 hover:text-emerald-700'
@@ -363,7 +378,7 @@ export default function InvoicesPage() {
                         </button>
                         <button
                           onClick={() => handleEdit(invoice)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-indigo-600 hover:bg-indigo-500/15 transition-colors"
+                          className="p-2 rounded-xl text-text-secondary hover:text-indigo-600 hover:bg-indigo-500/15 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
                           title="Edit invoice"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -372,7 +387,7 @@ export default function InvoicesPage() {
                         </button>
                         <button
                           onClick={() => handleDelete(invoice.id)}
-                          className="p-2 rounded-xl text-text-secondary hover:text-red-600 hover:bg-red-500/15 transition-colors"
+                          className="p-2 rounded-xl text-text-secondary hover:text-red-600 hover:bg-red-500/15 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
                           title="Delete invoice"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -448,7 +463,7 @@ export default function InvoicesPage() {
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-surface-border shrink-0">
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">Reminder History</h2>
+              <h2 className="text-lg font-semibold text-text-primary">Strategic Intelligence Log</h2>
               <p className="text-sm text-text-secondary mt-0.5">
                 {historyInvoice.clientName} — {formatCurrency(historyInvoice.amount)}
               </p>
@@ -471,58 +486,150 @@ export default function InvoicesPage() {
                 <svg className="w-12 h-12 mx-auto mb-3 text-text-dim opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <p className="text-text-muted">No reminders sent yet for this invoice.</p>
+                <p className="text-text-muted">No strategic nudges deployed yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {historyData.map((log) => (
-                  <div key={log.id} className="p-4 rounded-xl border border-surface-border bg-surface-base hover:bg-surface-raised transition-colors">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {/* Status badge */}
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          log.status === 'sent'
-                            ? 'bg-green-100 text-green-700'
-                            : log.status === 'failed'
-                            ? 'bg-red-100 text-red-700'
-                            : log.status === 'dead_letter'
-                            ? 'bg-orange-100 text-orange-700'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {log.status === 'sent' && (
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          )}
-                          {log.status === 'failed' && (
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                          )}
-                          {log.status}
-                        </span>
-                        {/* Channel */}
-                        {log.channel && (
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            {log.channel}
+                {historyData.map((log) => {
+                  if (log._type === 'reminder') {
+                    return (
+                      <div key={`reminder-${log.id}`} className="p-4 rounded-xl border border-surface-border bg-surface-base hover:bg-surface-raised transition-colors">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            {/* Status badge */}
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                              log.status === 'sent'
+                                ? 'bg-green-100 text-green-700'
+                                : log.status === 'failed'
+                                ? 'bg-red-100 text-red-700'
+                                : log.status === 'dead_letter'
+                                ? 'bg-orange-100 text-orange-700'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {log.status === 'sent' && (
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                              )}
+                              {log.status === 'failed' && (
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                              )}
+                              {log.status}
+                            </span>
+                            {/* Channel */}
+                            {log.channel && (
+                              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                {log.channel}
+                              </span>
+                            )}
+                            {/* Stage */}
+                            <span className="text-xs text-text-muted">
+                              {log.stage === 0 ? 'Manual' : `Stage ${log.stage}`}
+                            </span>
+                          </div>
+                          <span className="text-xs text-text-muted whitespace-nowrap">
+                            {new Date(log._date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+                            {new Date(log._date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                           </span>
+                        </div>
+                        {/* Message preview */}
+                        {log.messageBody && (
+                          <p className="text-sm text-text-secondary line-clamp-2 mt-2">{log.messageBody}</p>
                         )}
-                        {/* Stage */}
-                        <span className="text-xs text-text-muted">
-                          {log.stage === 0 ? 'Manual' : `Stage ${log.stage}`}
-                        </span>
+                        {/* Persuasion Strategy */}
+                        {log.persuasionStrategy && (
+                          <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                            </svg>
+                            {log.persuasionStrategy}
+                          </div>
+                        )}
+                        {/* Error */}
+                        {log.error && (
+                          <p className="text-xs text-red-500 mt-1">Error: {log.error}</p>
+                        )}
                       </div>
-                      <span className="text-xs text-text-muted whitespace-nowrap">
-                        {new Date(log.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
-                        {new Date(log.sentAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
-                    </div>
-                    {/* Message preview */}
-                    {log.messageBody && (
-                      <p className="text-sm text-text-secondary line-clamp-2 mt-1">{log.messageBody}</p>
-                    )}
-                    {/* Error */}
-                    {log.error && (
-                      <p className="text-xs text-red-500 mt-1">Error: {log.error}</p>
-                    )}
-                  </div>
-                ))}
+                    )
+                  }
+
+                  if (log._type === 'tracking') {
+                    const isEmailOpen = log.event === 'email_opened'
+                    return (
+                      <div key={`tracking-${log.id}`} className="p-4 rounded-xl border border-surface-border bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isEmailOpen ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
+                              {isEmailOpen ? (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                              )}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-text-primary">
+                                {isEmailOpen ? 'Client Opened Email' : 'Client Viewed Payment Page'}
+                              </p>
+                              <p className="text-xs text-text-muted mt-0.5">
+                                {log.metadata?.userAgent ? (log.metadata.userAgent.length > 40 ? log.metadata.userAgent.substring(0, 40) + '...' : log.metadata.userAgent) : 'Tracking pixel triggered'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-text-muted whitespace-nowrap">
+                            {new Date(log._date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+                            {new Date(log._date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  if (log._type === 'event') {
+                    let title = 'System Event Occurred'
+                    let icon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    let color = 'bg-slate-100 text-slate-600'
+                    let bgColor = 'bg-slate-50/30 hover:bg-slate-50/50'
+
+                    if (log.eventType === 'created') {
+                      title = 'Invoice Created'
+                      icon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      color = 'bg-emerald-100 text-emerald-600'
+                    } else if (log.eventType === 'paid' || log.eventType === 'client_notified_paid') {
+                      title = log.eventType === 'paid' ? 'Invoice Marked as Paid' : 'Client Indicated Payment'
+                      icon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      color = 'bg-green-100 text-green-600'
+                      bgColor = 'bg-green-50/30 hover:bg-green-50/50'
+                    } else if (log.eventType === 'overdue') {
+                      title = 'Invoice Marked Overdue'
+                      icon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      color = 'bg-amber-100 text-amber-600'
+                      bgColor = 'bg-amber-50/30 hover:bg-amber-50/50'
+                    } else if (log.eventType === 'payment_due') {
+                      title = 'Invoice Payment Due Today'
+                      icon = <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      color = 'bg-blue-100 text-blue-600'
+                    }
+
+                    return (
+                      <div key={`event-${log.id}`} className={`p-4 rounded-xl border border-surface-border ${bgColor} transition-colors`}>
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${color}`}>
+                              {icon}
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-text-primary">{title}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-text-muted whitespace-nowrap">
+                            {new Date(log._date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{' '}
+                            {new Date(log._date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  }
+
+                  return null
+                })}
               </div>
             )}
           </div>

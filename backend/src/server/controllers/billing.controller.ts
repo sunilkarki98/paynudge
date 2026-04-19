@@ -3,7 +3,6 @@ import {
   lemonSqueezySetup,
   createCheckout,
   getCustomer,
-  verifyWebhookSignature,
 } from '@lemonsqueezy/lemonsqueezy.js'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'

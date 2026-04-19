@@ -59,6 +59,7 @@ model User {
   chaseUntilPaid    Boolean   @default(false)  // Global default for new invoices
   chaseIntervalDays Int       @default(7)      // Default recurring chase interval
   isAdmin           Boolean   @default(false)
+  shieldMode        Boolean   @default(false)
 
   // Subscription & Billing
   subscriptionTier           SubscriptionTier @default(FREE)
@@ -85,6 +86,22 @@ model Client {
   smsNumber      String?
   chasingProfile ChasingProfile @default(NORMAL)
   contactChannel ContactChannel @default(EMAIL)
+
+  // Behavioral Tracking & Overrides
+  behaviorScore        Int      @default(100)
+  behaviorProfile      String   @default("UNKNOWN") // 'RELIABLE', 'LATE', 'GHOST'
+  averageDaysToPay     Int?
+  overrideTone         String?  // e.g., "FRIENDLY"
+  
+  // Advanced Behavioral Intelligence
+  behaviorType         String?  // 'SLOW_BUT_RELIABLE', 'REMINDER_TRIGGERED', 'CASHFLOW_CONSTRAINED', 'AVOIDANT', 'CORPORATE_DELAY', 'HIGH_RISK_GHOST'
+  varianceInDays       Int?
+  responseDelayAverage Int?
+  toneSensitivity      String?
+  paymentPattern       String?
+  paymentReliability   Decimal? @db.Decimal(5, 2)
+  engagementScore      Decimal? @db.Decimal(5, 2)
+
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -120,10 +137,11 @@ model Invoice {
   chaseIntervalDays  Int              @default(7)  // Repeat every N days after stage 4
 
   // Reminder tracking
-  reminderStage      Int              @default(0) // 0=none, 1=due, 2=stage1, 3=stage2, 4=stage3
-  lastReminderSentAt DateTime?
-  lastChaseSentAt    DateTime?        // Last recurring chase reminder
-  idempotencyKeys    String[]         @default([])
+  reminderStage        Int              @default(0) // 0=none, 1=due, 2=stage1, 3=stage2, 4=stage3
+  lastReminderSentAt   DateTime?
+  lastChaseSentAt      DateTime?        // Last recurring chase reminder
+  nextScheduledChaseAt DateTime?        // Exact computed time for next smart delivery
+  idempotencyKeys      String[]         @default([])
 
   // File ingestion
   sourceFile         String?          // Original uploaded file path/reference
@@ -160,6 +178,7 @@ model ReminderLog {
   channel         String?  // "email", "sms", "system" — which channel was used
   tone            String?  // Which tone was used for message generation
   messageBody     String?  // Generated message content (for audit trail)
+  persuasionStrategy String? // Behavioral trigger used (e.g. "Loss Aversion")
   sentAt          DateTime @default(now())
   invoice         Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
@@ -240,9 +259,11 @@ model AIMetadata {
   riskScore      RiskLevel @default(MEDIUM)
   riskFactors    Json?     // Array of risk factor strings
   extractedData  Json?     // Raw AI-extracted fields from ingestion
-  suggestedTone  ReminderTone? // AI-suggested tone based on context
-  llmResponse    Json?     // Raw LLM response for audit
-  createdAt      DateTime  @default(now())
+  suggestedTone      ReminderTone? // AI-suggested tone based on context
+  llmResponse        Json?     // Raw LLM response for audit
+  persuasionStrategy String?   // E.g. "Loss Aversion Framing"
+  recommendedAction  String?   // The next best action calculated by the engine
+  createdAt          DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   invoice        Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 }
@@ -254,4 +275,25 @@ model SystemSetting {
   key       String   @unique
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// ─── Transactional Outbox ────────────────────────────────
+
+model OutboxEvent {
+  id        String   @id @default(cuid())
+  eventType String   // e.g., "invoice.created", "invoice.paid"
+  payload   Json     // The event data payload
+  processed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([processed, createdAt])
+}
+
+// ─── Data Moat (Anonymized Global Stats) ─────────────────
+
+model BehavioralMetric {
+  id          String   @id @default(cuid())
+  metricKey   String   @unique
+  metricValue Json
+  updatedAt   DateTime @updatedAt
 }

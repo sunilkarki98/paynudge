@@ -229,16 +229,15 @@ export async function sendReminderHandler(req: Request, res: Response): Promise<
 
     if (!result.success) {
       res.status(500).json({
-        error: 'Failed to send reminder',
+        error: 'Failed to queue reminder',
         details: result.errors,
       })
       return
     }
 
-    res.json({
+    res.status(202).json({
       success: true,
-      channels: result.channels,
-      message: `Reminder sent via ${result.channels.join(', ')}`,
+      message: result.message,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Internal server error'

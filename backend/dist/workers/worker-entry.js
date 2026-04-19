@@ -301,10 +301,33 @@ async function generateWithLLM(ai, ctx) {
   const generatorModel = await getSetting("GEMINI_GENERATOR_MODEL", "gemini-2.0-flash");
   const model = ai.getGenerativeModel({ model: generatorModel });
   const toneInstructions = {
-    FRIENDLY: "warm, casual, empathetic. Use conversational language. Assume good intent. Brief use of emoji is ok.",
-    PROFESSIONAL: "formal, polite, direct. Business-like and respectful. No emoji. Clear and concise.",
-    FIRM: "direct, serious, urgent. Mention potential consequences professionally. Still respectful but leave no ambiguity about urgency."
+    FRIENDLY: "Warm, casual, like a quick check-in from a friend. Very natural language, do not sound automated.",
+    PROFESSIONAL: "Polite, direct, standard business email style. Keep it human but strictly professional.",
+    FIRM: "Serious and urgent, but still human. Do not sound like a corporate collection agency, sound like a frustrated but professional contractor."
   };
+  let actualTone = ctx.tone;
+  if (ctx.overrideTone && ["FRIENDLY", "PROFESSIONAL", "FIRM"].includes(ctx.overrideTone)) {
+    actualTone = ctx.overrideTone;
+  } else if (ctx.behaviorProfile === "RELIABLE" && actualTone === "FIRM") {
+    actualTone = "PROFESSIONAL";
+  } else if (ctx.behaviorProfile === "GHOST" && actualTone === "FRIENDLY") {
+    actualTone = "FIRM";
+  }
+  const date = /* @__PURE__ */ new Date();
+  const isEndOfMonth = date.getDate() > 25;
+  const isStartOfMonth = date.getDate() <= 5;
+  let reasonWhy = "";
+  if (actualTone === "FRIENDLY" || actualTone === "PROFESSIONAL") {
+    if (isEndOfMonth) {
+      reasonWhy = "I'm currently wrapping up my bookkeeping for the month and trying to close out open ledgers.";
+    } else if (isStartOfMonth) {
+      reasonWhy = "I'm doing my start-of-month accounting reconciliation.";
+    } else {
+      reasonWhy = "I am doing my weekly admin and bookkeeping.";
+    }
+  } else if (actualTone === "FIRM") {
+    reasonWhy = "I am finalizing my schedule and accounting. I cannot allocate further hours or lock in new project dates until past-due balances are cleared.";
+  }
   const stageContext = ctx.daysOverdue && ctx.daysOverdue > 0 ? `The invoice is ${ctx.daysOverdue} days overdue.` : "The invoice is due today or coming up soon.";
   const prompt = `You are writing a payment reminder email for a freelancer's invoicing system.
 
@@ -314,21 +337,20 @@ CONTEXT:
 - Amount: $${ctx.amount.toLocaleString()}
 - Due date: ${ctx.dueDate}
 - ${stageContext}
-- This is reminder stage ${ctx.stage} of the escalation sequence.
 - Sender: ${ctx.senderName || "the freelancer"}
+- REAL-WORLD REASON FOR EMAILING TODAY (incorporate this organically): "${reasonWhy}"
 ${ctx.paymentLink ? `- Payment link: ${ctx.paymentLink}` : ""}
 
-TONE: ${ctx.tone} \u2014 ${toneInstructions[ctx.tone]}
+TONE: ${actualTone} \u2014 ${toneInstructions[actualTone]}
 
 RULES:
-1. Keep it SHORT (3-5 sentences max for the body)
-2. Do NOT be aggressive, threatening, or spammy
-3. Do NOT use legal threats or collection agency language
-4. Include the invoice amount and due date naturally
-5. If a payment link is provided, mention it as a convenient way to pay
-6. End with a professional sign-off line
-7. Do NOT include "Dear" or overly formal greetings \u2014 use "Hi {name}" or "Hello {name}"
-8. The email must work standalone without any attachments
+1. MUST sound 100% human-typed and organic, not automated. Do not use phrases like "This is a reminder".
+2. Keep it SHORT (2-4 sentences max for the body).
+3. Naturally mention the invoice amount and due date in passing.
+4. If a payment link is provided, include it organically (e.g., "Here's a link to settle it: [link]").
+5. End with a natural sign-off line (e.g., "Best,", "Thanks,", "Talk soon,"). Vary these so they aren't identical.
+6. Use natural greetings like "Hi {name}" or "Hey {name},".
+7. Make slight conversational variations so repeated messages don't feel robotic.
 
 Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
@@ -409,140 +431,142 @@ function getTemplateForStage(stage, tone) {
   const templates = {
     FRIENDLY: {
       1: {
-        subject: "Friendly reminder \u2014 Invoice {{invoiceNumber}} is due today",
+        subject: "Quick check-in on Invoice {{invoiceNumber}}",
         body: `Hi {{clientName}},
 
-Just a quick heads-up that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}). No rush\u2014just wanted to make sure it didn't slip through the cracks! \u{1F60A}
+Hope you're having a great week! Just a quick heads up that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}).
 
-You can pay quickly here: {{paymentLink}}
+If you could process that when you have a moment, I'd really appreciate it. Here's a link to settle it: {{paymentLink}}
 
-Thanks so much!`,
-        sms: "Hi {{clientName}}! Reminder: Invoice {{invoiceNumber}} ({{amount}}) is due today. Thanks!"
+Talk soon!`,
+        sms: "Hey {{clientName}}! Just a quick heads up that invoice {{invoiceNumber}} for {{amount}} is due today. Thanks!"
       },
       2: {
-        subject: "Checking in \u2014 Invoice {{invoiceNumber}} is {{daysOverdue}} days past due",
+        subject: "Invoice {{invoiceNumber}} check-in",
         body: `Hi {{clientName}},
 
-Hope you're doing well! I noticed invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past due. Totally understand if it slipped by \u2014 happens to all of us!
+Hope you're doing well! I'm just doing some bookkeeping and noticed invoice {{invoiceNumber}} for {{amount}} is a few days past due. No worries at all, I know things get busy!
 
-You can pay quickly here: {{paymentLink}}
+Here is a link to settle it whenever you get a chance: {{paymentLink}}
 
-Would love to get this sorted. Let me know if you have any questions!`,
-        sms: "Hi {{clientName}}, just checking in \u2014 invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Let me know!"
+Let me know if you have any questions.`,
+        sms: "Hey {{clientName}}, just checking in on invoice {{invoiceNumber}} ({{amount}}). Let me know if you have questions!"
       },
       3: {
-        subject: "Following up \u2014 Invoice {{invoiceNumber}} is now {{daysOverdue}} days overdue",
+        subject: "Following up on Invoice {{invoiceNumber}}",
         body: `Hi {{clientName}},
 
-I wanted to follow up on invoice {{invoiceNumber}} for {{amount}} which was due on {{dueDate}} \u2014 it's now {{daysOverdue}} days overdue. I'd really appreciate it if you could look into this when you get a chance.
+I wanted to circle back on invoice {{invoiceNumber}} for {{amount}} that was due on {{dueDate}}. It's currently {{daysOverdue}} days overdue.
 
-You can pay quickly here: {{paymentLink}}
+Could you please take a look when you get a second? Here's the payment link: {{paymentLink}}
 
-If there's an issue, please let me know so we can work it out together!`,
-        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is now {{daysOverdue}} days overdue. Please let me know the status."
+Thanks!`,
+        sms: "Hi {{clientName}}, following up on invoice {{invoiceNumber}} ({{amount}}). Could you take a look when you get a chance?"
       },
       4: {
-        subject: "Final reminder \u2014 Invoice {{invoiceNumber}} requires your attention",
+        subject: "Invoice {{invoiceNumber}} status",
         body: `Hi {{clientName}},
 
-This is my final reminder about invoice {{invoiceNumber}} for {{amount}}, which is now {{daysOverdue}} days past due since {{dueDate}}. I really need to get this resolved.
+I really need to get invoice {{invoiceNumber}} for {{amount}} squared away, as it's now {{daysOverdue}} days past due.
 
-You can pay quickly here: {{paymentLink}}
+Could you please let me know when this will be paid? Here is the link: {{paymentLink}}
 
-Please let me know how you'd like to proceed. I value our working relationship and want to sort this out.`,
-        sms: "Final reminder: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please arrange payment. Thanks."
+Thanks.`,
+        sms: "Hi {{clientName}}, I need to get invoice {{invoiceNumber}} ({{amount}}) squared away. Please let me know the status."
       }
     },
     PROFESSIONAL: {
       1: {
-        subject: "Payment Reminder \u2014 Invoice {{invoiceNumber}}",
-        body: `Hello {{clientName}},
+        subject: "Invoice {{invoiceNumber}} is due today",
+        body: `Hi {{clientName}},
 
-This is a reminder that invoice {{invoiceNumber}} for {{amount}} is due today, {{dueDate}}. We would appreciate prompt payment at your earliest convenience.
+Just writing to let you know that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}).
 
-You can pay quickly here: {{paymentLink}}
+You can pay it directly here: {{paymentLink}}
 
-Thank you for your attention to this matter.`,
-        sms: "Reminder: Invoice {{invoiceNumber}} ({{amount}}) is due today. Please arrange payment. Thank you."
+Best,`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is due today. Thanks!"
       },
       2: {
-        subject: "Payment Follow-Up \u2014 Invoice {{invoiceNumber}}",
-        body: `Hello {{clientName}},
+        subject: "Following up on Invoice {{invoiceNumber}}",
+        body: `Hi {{clientName}},
 
-We would like to bring to your attention that invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past the due date of {{dueDate}}.
+I'm following up because invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past its due date of {{dueDate}}.
 
-You can pay quickly here: {{paymentLink}}
+Please process this at your earliest convenience. Here is the link: {{paymentLink}}
 
-If payment has already been made, please disregard this notice. Otherwise, we kindly request that you arrange payment at your earliest convenience.`,
-        sms: "Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Please arrange payment."
+Best,`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Please process when able."
       },
       3: {
-        subject: "Urgent: Payment Overdue \u2014 Invoice {{invoiceNumber}}",
-        body: `Dear {{clientName}},
+        subject: "Invoice {{invoiceNumber}} - Past Due",
+        body: `Hi {{clientName}},
 
-This is an important notice regarding invoice {{invoiceNumber}} for {{amount}}, which is now {{daysOverdue}} days overdue since {{dueDate}}. We kindly request immediate payment to avoid any disruption to our services.
+Invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue (due {{dueDate}}). I need to get this resolved as soon as possible.
 
-You can pay quickly here: {{paymentLink}}
+Please let me know if there's an issue holding this up, or you can pay here: {{paymentLink}}
 
-If there are any concerns regarding this payment, please contact us immediately so we can work together to resolve them.`,
-        sms: "Urgent: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment requested."
+Regards,`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please update me on the status."
       },
       4: {
-        subject: "Final Notice: Payment Required \u2014 Invoice {{invoiceNumber}}",
-        body: `Dear {{clientName}},
+        subject: "Overdue Invoice {{invoiceNumber}} - Attention Required",
+        body: `Hi {{clientName}},
 
-This is our final notice regarding invoice {{invoiceNumber}} for {{amount}}, which has been outstanding for {{daysOverdue}} days since the due date of {{dueDate}}. Immediate payment is required.
+Invoice {{invoiceNumber}} for {{amount}} has been outstanding for {{daysOverdue}} days. I need this paid immediately.
 
-You can pay quickly here: {{paymentLink}}
+Here is the link to pay: {{paymentLink}}
 
-Please arrange payment immediately or provide confirmation if payment has already been made. Failure to respond may necessitate additional measures.`,
-        sms: "FINAL NOTICE: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment required."
+Please let me know when this is handled.`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment is needed."
       }
     },
     FIRM: {
       1: {
-        subject: "Payment Due Today \u2014 Invoice {{invoiceNumber}}",
-        body: `{{clientName}},
+        subject: "Invoice {{invoiceNumber}} due today",
+        body: `Hi {{clientName}},
 
-Invoice {{invoiceNumber}} for {{amount}} is due today, {{dueDate}}. Please ensure payment is processed today.
+Invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}). Please ensure this is processed today.
 
-Pay now: {{paymentLink}}
+Payment link: {{paymentLink}}
 
-Thank you.`,
-        sms: "Invoice {{invoiceNumber}} ({{amount}}) due today. Please pay promptly."
+Thanks.`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is due today. Please process today."
       },
       2: {
-        subject: "Overdue Payment \u2014 Invoice {{invoiceNumber}} ({{daysOverdue}} Days)",
-        body: `{{clientName}},
+        subject: "Past Due: Invoice {{invoiceNumber}}",
+        body: `Hi {{clientName}},
 
-Invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue. This payment was due on {{dueDate}} and requires your immediate attention.
+Invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue. Please get this paid today.
 
-Pay now: {{paymentLink}}
+Payment link: {{paymentLink}}
 
-Please arrange payment today.`,
-        sms: "Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment needed."
+Thanks.`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please process today."
       },
       3: {
-        subject: "URGENT: Overdue Invoice {{invoiceNumber}} \u2014 {{daysOverdue}} Days Outstanding",
-        body: `{{clientName}},
+        subject: "URGENT: Invoice {{invoiceNumber}}",
+        body: `Hi {{clientName}},
 
-Invoice {{invoiceNumber}} for {{amount}} has been outstanding for {{daysOverdue}} days. Despite previous reminders, payment has not been received. This matter requires your urgent attention.
+Invoice {{invoiceNumber}} for {{amount}} is {{daysOverdue}} days overdue. I've sent multiple reminders and need this paid immediately.
 
-Pay now: {{paymentLink}}
+Payment link: {{paymentLink}}
 
-Please process this payment immediately or contact us to discuss the situation. Continued non-payment may result in suspension of services.`,
-        sms: "URGENT: Invoice {{invoiceNumber}} ({{amount}}) {{daysOverdue}} days overdue. Pay now or contact us immediately."
+Please confirm when this is paid.`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. I need this paid immediately."
       },
       4: {
-        subject: "FINAL NOTICE \u2014 Invoice {{invoiceNumber}} ({{daysOverdue}} Days Overdue)",
-        body: `{{clientName}},
+        subject: "FINAL NOTICE: Invoice {{invoiceNumber}}",
+        body: `Hi {{clientName}},
 
-This is our FINAL notice regarding invoice {{invoiceNumber}} for {{amount}}, now {{daysOverdue}} days past the due date of {{dueDate}}.
+This is my final notice regarding invoice {{invoiceNumber}} for {{amount}}, which is {{daysOverdue}} days late.
 
-Pay now: {{paymentLink}}
+If this isn't paid immediately, I will have to pause all ongoing work and escalate this.
 
-If payment is not received within 48 hours, we will be forced to take further action, which may include suspension of ongoing work and formal collection proceedings. Please treat this as a matter of urgency.`,
-        sms: "FINAL NOTICE: Invoice {{invoiceNumber}} ({{amount}}) {{daysOverdue}}d overdue. Payment required within 48hrs."
+Payment link: {{paymentLink}}
+
+I need this resolved today.`,
+        sms: "Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Final notice to pay immediately."
       }
     }
   };
@@ -550,60 +574,18 @@ If payment is not received within 48 hours, we will be forced to take further ac
   return templates[tone][effectiveStage] || templates.PROFESSIONAL[effectiveStage];
 }
 function buildEmailHtml(title, plainBody, ctx) {
-  const accentColors = {
-    1: "#06b6d4,#0891b2",
-    // Cyan
-    2: "#eab308,#ca8a04",
-    // Yellow
-    3: "#f97316,#ea580c",
-    // Orange
-    4: "#ef4444,#dc2626"
-    // Red
-  };
-  const accent = accentColors[Math.min(ctx.stage, 4)] || accentColors[1];
-  const htmlParagraphs = plainBody.split("\n\n").filter((p) => p.trim()).map((p) => `<p style="color:#cbd5e1;line-height:1.6;font-size:15px;margin:0 0 16px;">${escapeHtml(p.trim())}</p>`).join("");
-  const paymentButton = ctx.paymentLink ? `<div style="margin:24px 0;text-align:center;">
-        <a href="${escapeHtml(ctx.paymentLink)}" style="background:linear-gradient(90deg,#06b6d4,#8b5cf6);color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:600;display:inline-block;font-size:16px;">\u{1F4B3} Pay Now \u2014 $${ctx.amount.toLocaleString()}</a>
-      </div>` : "";
-  const invoiceId = ctx.invoiceNumber || "N/A";
-  const detailsCard = `
-    <div style="background:#1e293b;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #334155;">
-      <table style="width:100%;border-collapse:collapse;">
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Invoice</td>
-          <td style="color:#f1f5f9;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">${escapeHtml(invoiceId)}</td>
-        </tr>
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Amount Due</td>
-          <td style="color:#22d3ee;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">$${ctx.amount.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Due Date</td>
-          <td style="color:#f1f5f9;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">${escapeHtml(new Date(ctx.dueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }))}</td>
-        </tr>
-      </table>
-    </div>`;
+  const htmlParagraphs = plainBody.split("\n\n").filter((p) => p.trim()).map((p) => `<p style="margin: 0 0 1em 0;">${escapeHtml(p.trim())}</p>`).join("");
+  const paymentLinkHtml = ctx.paymentLink && !plainBody.includes(ctx.paymentLink) ? `<p style="margin: 1.5em 0;"><a href="${escapeHtml(ctx.paymentLink)}" style="color: #2563eb; text-decoration: underline;">Pay Invoice ${escapeHtml(ctx.invoiceNumber || "")} ($${ctx.amount.toLocaleString()})</a></p>` : "";
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-    <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px;overflow:hidden;border:1px solid #334155;">
-      <div style="background:linear-gradient(90deg,${accent});padding:24px 32px;">
-        <h1 style="color:#fff;margin:0;font-size:20px;font-weight:600;">\u26A1 Invoice Chaser</h1>
-      </div>
-      <div style="padding:32px;">
-        ${htmlParagraphs}
-        ${detailsCard}
-        ${paymentButton}
-      </div>
-      <div style="padding:16px 32px;border-top:1px solid #334155;">
-        <p style="color:#64748b;font-size:12px;margin:0;">This is an automated reminder from Invoice Chaser.</p>
-      </div>
-    </div>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;font-size:14px;color:#000000;line-height:1.5;">
+  <div style="max-width:600px;margin:0 auto;padding:20px;">
+    ${htmlParagraphs}
+    ${paymentLinkHtml}
   </div>
 </body>
 </html>`;
@@ -1125,14 +1107,14 @@ async function enqueueEmailJob(data) {
         // 30s, 60s, 120s, 240s, 480s
       }
     });
-    log16.info("Email job enqueued", {
+    log17.info("Email job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log16.info("Email job already exists (idempotent skip)", {
+      log17.info("Email job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1155,7 +1137,7 @@ async function enqueueDelayedEmailJob(data, delayMs) {
         delay: 3e4
       }
     });
-    log16.info("Delayed email job enqueued", {
+    log17.info("Delayed email job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage,
@@ -1164,7 +1146,7 @@ async function enqueueDelayedEmailJob(data, delayMs) {
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log16.info("Delayed email job already exists (idempotent skip)", {
+      log17.info("Delayed email job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1185,11 +1167,11 @@ async function cancelPendingEmailJobs(invoiceId) {
         if (state === "delayed" || state === "waiting") {
           await job.remove();
           cancelled++;
-          log16.info("Cancelled pending email job", { jobId, invoiceId, stage, state });
+          log17.info("Cancelled pending email job", { jobId, invoiceId, stage, state });
         }
       }
     } catch (err) {
-      log16.warn("Failed to cancel email job", {
+      log17.warn("Failed to cancel email job", {
         jobId,
         invoiceId,
         error: err instanceof Error ? err.message : String(err)
@@ -1198,14 +1180,14 @@ async function cancelPendingEmailJobs(invoiceId) {
   }
   return cancelled;
 }
-var log16;
+var log17;
 var init_email_queue = __esm({
   "src/modules/queues/email-queue.ts"() {
     "use strict";
     init_queue();
     init_queue_names();
     init_logger();
-    log16 = logger.child({ module: "email-queue" });
+    log17 = logger.child({ module: "email-queue" });
   }
 });
 
@@ -1232,7 +1214,7 @@ async function enqueueWhatsAppJob(data) {
         delay: 3e4
       }
     });
-    log17.info("WhatsApp job enqueued", {
+    log18.info("WhatsApp job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage,
@@ -1240,7 +1222,7 @@ async function enqueueWhatsAppJob(data) {
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log17.info("WhatsApp job already exists (idempotent skip)", {
+      log18.info("WhatsApp job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1262,7 +1244,7 @@ async function enqueueDelayedWhatsAppJob(data, delayMs) {
         delay: 3e4
       }
     });
-    log17.info("Delayed WhatsApp job enqueued", {
+    log18.info("Delayed WhatsApp job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage,
@@ -1271,7 +1253,7 @@ async function enqueueDelayedWhatsAppJob(data, delayMs) {
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log17.info("Delayed WhatsApp job already exists (idempotent skip)", {
+      log18.info("Delayed WhatsApp job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1292,11 +1274,11 @@ async function cancelPendingWhatsAppJobs(invoiceId) {
         if (state === "delayed" || state === "waiting") {
           await job.remove();
           cancelled++;
-          log17.info("Cancelled pending whatsapp job", { jobId, invoiceId, stage, state });
+          log18.info("Cancelled pending whatsapp job", { jobId, invoiceId, stage, state });
         }
       }
     } catch (err) {
-      log17.warn("Failed to cancel whatsapp job", {
+      log18.warn("Failed to cancel whatsapp job", {
         jobId,
         invoiceId,
         error: err instanceof Error ? err.message : String(err)
@@ -1305,14 +1287,14 @@ async function cancelPendingWhatsAppJobs(invoiceId) {
   }
   return cancelled;
 }
-var log17;
+var log18;
 var init_whatsapp_queue = __esm({
   "src/modules/queues/whatsapp-queue.ts"() {
     "use strict";
     init_queue();
     init_queue_names();
     init_logger();
-    log17 = logger.child({ module: "whatsapp-queue" });
+    log18 = logger.child({ module: "whatsapp-queue" });
   }
 });
 
@@ -1339,7 +1321,7 @@ async function enqueueSMSJob(data) {
         delay: 3e4
       }
     });
-    log18.info("SMS job enqueued", {
+    log19.info("SMS job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage,
@@ -1347,7 +1329,7 @@ async function enqueueSMSJob(data) {
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log18.info("SMS job already exists (idempotent skip)", {
+      log19.info("SMS job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1369,7 +1351,7 @@ async function enqueueDelayedSMSJob(data, delayMs) {
         delay: 3e4
       }
     });
-    log18.info("Delayed SMS job enqueued", {
+    log19.info("Delayed SMS job enqueued", {
       jobId,
       invoiceId: data.invoiceId,
       stage: data.stage,
@@ -1378,7 +1360,7 @@ async function enqueueDelayedSMSJob(data, delayMs) {
     });
   } catch (err) {
     if (err instanceof Error && err.message.includes("Job already exists")) {
-      log18.info("Delayed SMS job already exists (idempotent skip)", {
+      log19.info("Delayed SMS job already exists (idempotent skip)", {
         jobId,
         invoiceId: data.invoiceId
       });
@@ -1399,11 +1381,11 @@ async function cancelPendingSMSJobs(invoiceId) {
         if (state === "delayed" || state === "waiting") {
           await job.remove();
           cancelled++;
-          log18.info("Cancelled pending SMS job", { jobId, invoiceId, stage, state });
+          log19.info("Cancelled pending SMS job", { jobId, invoiceId, stage, state });
         }
       }
     } catch (err) {
-      log18.warn("Failed to cancel SMS job", {
+      log19.warn("Failed to cancel SMS job", {
         jobId,
         invoiceId,
         error: err instanceof Error ? err.message : String(err)
@@ -1412,14 +1394,14 @@ async function cancelPendingSMSJobs(invoiceId) {
   }
   return cancelled;
 }
-var log18;
+var log19;
 var init_sms_queue = __esm({
   "src/modules/queues/sms-queue.ts"() {
     "use strict";
     init_queue();
     init_queue_names();
     init_logger();
-    log18 = logger.child({ module: "sms-queue" });
+    log19 = logger.child({ module: "sms-queue" });
   }
 });
 
@@ -1530,14 +1512,16 @@ async function withIdempotencyGuard(channel, job, executeBusiness) {
       select: { idempotencyKeys: true, reminderStage: true }
     });
     if (currentInvoice) {
-      await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          idempotencyKeys: currentInvoice.idempotencyKeys.filter((k) => k !== idempotencyKey),
-          reminderStage: Math.max(0, stage - 1),
-          lastReminderSentAt: null
-        }
-      });
+      await prisma.$transaction([
+        prisma.$executeRaw`UPDATE "Invoice" SET "idempotencyKeys" = array_remove("idempotencyKeys", ${idempotencyKey}) WHERE id = ${invoiceId}`,
+        prisma.invoice.update({
+          where: { id: invoiceId },
+          data: {
+            reminderStage: Math.max(0, stage - 1),
+            lastReminderSentAt: null
+          }
+        })
+      ]);
     }
     await prisma.reminderLog.create({
       data: {
@@ -1556,11 +1540,15 @@ async function withIdempotencyGuard(channel, job, executeBusiness) {
 // src/workers/email.worker.ts
 var log8 = logger.child({ module: "email-worker" });
 async function processEmailJob(job) {
-  const { stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data;
+  const { invoiceId, stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data;
   await withIdempotencyGuard("email", job, async (invoice) => {
     const { generateMessage: generateMessage2 } = await Promise.resolve().then(() => (init_message_generator(), message_generator_exports));
     const { sendEmail: sendEmail2 } = await Promise.resolve().then(() => (init_email_sender(), email_sender_exports));
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const invoiceRecord = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { client: true }
+    });
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : void 0;
     const trackingPixelUrl = `${baseUrl}/api/track/email?invoice=${invoice.id}&stage=${stage}&t=${Date.now()}`;
     const generated = await generateMessage2({
@@ -1570,7 +1558,9 @@ async function processEmailJob(job) {
       stage,
       daysOverdue,
       paymentLink,
-      tone: reminderTone || "PROFESSIONAL"
+      tone: reminderTone || "PROFESSIONAL",
+      behaviorProfile: invoiceRecord?.client?.behaviorProfile || "UNKNOWN",
+      overrideTone: invoiceRecord?.client?.overrideTone || void 0
     });
     const result = await sendEmail2({
       userId: invoice.userId,
@@ -1663,31 +1653,59 @@ var log10 = logger.child({ module: "overdue-check-queue" });
 function getOverdueCheckQueue() {
   return createQueue(QUEUE_NAMES.OVERDUE_CHECK);
 }
+function calculateOptimalDeliveryTime(targetDate) {
+  const date = new Date(targetDate);
+  const day = date.getUTCDay();
+  const hours = date.getUTCHours();
+  let shiftDays = 0;
+  if (day === 5 && hours >= 17) {
+    shiftDays = 4;
+  } else if (day === 6) {
+    shiftDays = 3;
+  } else if (day === 0) {
+    shiftDays = 2;
+  }
+  if (shiftDays > 0) {
+    date.setUTCDate(date.getUTCDate() + shiftDays);
+    date.setUTCHours(10, 0, 0, 0);
+  }
+  return date;
+}
 async function scheduleOverdueChecks(data) {
   const queue = getOverdueCheckQueue();
   let checkpoints = [];
-  if (data.chasingProfile === "STRICT") {
+  if (data.customIntervals && typeof data.customIntervals === "object") {
+    const { stage2Days, stage3Days, stage4Days } = data.customIntervals;
     checkpoints = [
-      { daysOverdue: 1, stage: 2 },
-      { daysOverdue: 3, stage: 3 },
-      { daysOverdue: 5, stage: 4 }
-    ];
-  } else if (data.chasingProfile === "RELAXED") {
-    checkpoints = [
-      { daysOverdue: 7, stage: 2 },
-      { daysOverdue: 14, stage: 3 },
-      { daysOverdue: 30, stage: 4 }
+      { daysOverdue: Number(stage2Days) || 3, stage: 2 },
+      { daysOverdue: Number(stage3Days) || 7, stage: 3 },
+      { daysOverdue: Number(stage4Days) || 14, stage: 4 }
     ];
   } else {
-    checkpoints = [
-      { daysOverdue: 3, stage: 2 },
-      { daysOverdue: 7, stage: 3 },
-      { daysOverdue: 14, stage: 4 }
-    ];
+    if (data.chasingProfile === "STRICT") {
+      checkpoints = [
+        { daysOverdue: 1, stage: 2 },
+        { daysOverdue: 3, stage: 3 },
+        { daysOverdue: 5, stage: 4 }
+      ];
+    } else if (data.chasingProfile === "RELAXED") {
+      checkpoints = [
+        { daysOverdue: 7, stage: 2 },
+        { daysOverdue: 14, stage: 3 },
+        { daysOverdue: 30, stage: 4 }
+      ];
+    } else {
+      checkpoints = [
+        { daysOverdue: 3, stage: 2 },
+        { daysOverdue: 7, stage: 3 },
+        { daysOverdue: 14, stage: 4 }
+      ];
+    }
   }
   for (const checkpoint of checkpoints) {
     const jobId = `overdue:${data.invoiceId}:day:${checkpoint.daysOverdue}`;
-    const targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1e3);
+    let targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1e3);
+    targetTime = calculateOptimalDeliveryTime(targetTime);
     const delayMs = Math.max(0, targetTime.getTime() - Date.now());
     try {
       await queue.add(
@@ -1742,7 +1760,8 @@ async function scheduleOverdueChecks(data) {
 async function scheduleRecurringCheck(data, newDaysOverdue) {
   const queue = getOverdueCheckQueue();
   const jobId = `overdue:${data.invoiceId}:day:${newDaysOverdue}:recurring`;
-  const targetTime = new Date(new Date(data.dueDate).getTime() + newDaysOverdue * 24 * 60 * 60 * 1e3);
+  let targetTime = new Date(new Date(data.dueDate).getTime() + newDaysOverdue * 24 * 60 * 60 * 1e3);
+  targetTime = calculateOptimalDeliveryTime(targetTime);
   const delayMs = Math.max(0, targetTime.getTime() - Date.now());
   try {
     await queue.add(
@@ -1909,7 +1928,7 @@ async function processWhatsAppJob(job) {
   await withIdempotencyGuard("whatsapp", job, async (invoice) => {
     const { generateMessage: generateMessage2 } = await Promise.resolve().then(() => (init_message_generator(), message_generator_exports));
     const { sendWhatsApp: sendWhatsApp2 } = await Promise.resolve().then(() => (init_whatsapp_sender(), whatsapp_sender_exports));
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : void 0;
     const generated = await generateMessage2({
       clientName,
@@ -1969,13 +1988,18 @@ var import_bullmq5 = require("bullmq");
 init_redis();
 init_queue_names();
 init_logger();
+init_prisma();
 var log15 = logger.child({ module: "sms-worker" });
 async function processSMSJob(job) {
-  const { stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data;
+  const { invoiceId, stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data;
   await withIdempotencyGuard("sms", job, async (invoice) => {
     const { generateMessage: generateMessage2 } = await Promise.resolve().then(() => (init_message_generator(), message_generator_exports));
     const { sendSMS: sendSMS2 } = await Promise.resolve().then(() => (init_sms_sender(), sms_sender_exports));
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const invoiceRecord = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { client: true }
+    });
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : void 0;
     const generated = await generateMessage2({
       clientName,
@@ -1984,7 +2008,9 @@ async function processSMSJob(job) {
       stage,
       daysOverdue,
       paymentLink,
-      tone: reminderTone || "PROFESSIONAL"
+      tone: reminderTone || "PROFESSIONAL",
+      behaviorProfile: invoiceRecord?.client?.behaviorProfile || "UNKNOWN",
+      overrideTone: invoiceRecord?.client?.overrideTone || void 0
     });
     const textToSend = generated.smsText || generated.plainText.substring(0, 160);
     const result = await sendSMS2({
@@ -2024,13 +2050,75 @@ function startSMSWorker() {
   return worker;
 }
 
+// src/workers/outbox.worker.ts
+init_prisma();
+init_event_bus();
+init_logger();
+var log16 = logger.child({ module: "outbox-worker" });
+var isRunning = false;
+var pollInterval;
+async function processOutbox() {
+  if (isRunning) return;
+  isRunning = true;
+  try {
+    const events = await prisma.outboxEvent.findMany({
+      where: { processed: false },
+      take: 50,
+      orderBy: { createdAt: "asc" }
+    });
+    if (events.length === 0) {
+      isRunning = false;
+      return;
+    }
+    const eventIds = events.map((e) => e.id);
+    await prisma.outboxEvent.updateMany({
+      where: { id: { in: eventIds }, processed: false },
+      data: { processed: true }
+    });
+    for (const event of events) {
+      try {
+        eventBus.emit(event.eventType, event.payload);
+      } catch (err) {
+        log16.error("Failed to emit outbox event", {
+          eventId: event.id,
+          eventType: event.eventType,
+          error: err instanceof Error ? err.message : String(err)
+        });
+      }
+    }
+    await prisma.outboxEvent.deleteMany({
+      where: { id: { in: eventIds } }
+    });
+  } catch (error) {
+    log16.error("Error in outbox poller", {
+      error: error instanceof Error ? error.message : String(error)
+    });
+  } finally {
+    isRunning = false;
+  }
+}
+function startOutboxWorker(intervalMs = 5e3) {
+  log16.info("Starting outbox worker poller", { intervalMs });
+  processOutbox();
+  pollInterval = setInterval(processOutbox, intervalMs);
+  return {
+    close: async () => {
+      clearInterval(pollInterval);
+      while (isRunning) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      log16.info("Outbox worker closed");
+    }
+  };
+}
+
 // src/modules/notification/notification.subscriber.ts
 init_event_bus();
 init_email_queue();
 init_logger();
-var log19 = logger.child({ module: "notification-subscriber" });
+var log20 = logger.child({ module: "notification-subscriber" });
 async function onInvoiceCreated(event) {
-  log19.info("Handling invoice.created", { invoiceId: event.invoiceId });
+  log20.info("Handling invoice.created", { invoiceId: event.invoiceId });
   const dueDate = new Date(event.dueDate);
   const delayMs = Math.max(0, dueDate.getTime() - Date.now());
   const shouldSendEmail = ["EMAIL", "BOTH", "EMAIL_AND_SMS", "ALL"].includes(event.contactChannel);
@@ -2098,21 +2186,22 @@ async function onInvoiceCreated(event) {
     paymentLinkToken: event.paymentLinkToken,
     reminderTone: event.reminderTone,
     chaseUntilPaid: event.chaseUntilPaid,
-    chaseIntervalDays: event.chaseIntervalDays
+    chaseIntervalDays: event.chaseIntervalDays,
+    customIntervals: event.customIntervals
   });
-  log19.info("All jobs scheduled for new invoice", {
+  log20.info("All jobs scheduled for new invoice", {
     invoiceId: event.invoiceId,
     paymentDueIn: `${Math.round(delayMs / (1e3 * 60 * 60))}h`
   });
 }
 async function onInvoicePaymentDue(event) {
-  log19.info("Invoice payment due event received", {
+  log20.info("Invoice payment due event received", {
     invoiceId: event.invoiceId,
     dueDate: event.dueDate.toISOString()
   });
 }
 async function onInvoiceOverdue(event) {
-  log19.info("Invoice overdue event received", {
+  log20.info("Invoice overdue event received", {
     invoiceId: event.invoiceId,
     daysOverdue: event.daysOverdue,
     stage: event.stage
@@ -2171,7 +2260,7 @@ async function onInvoiceOverdue(event) {
   }
 }
 async function onInvoicePaid(event) {
-  log19.info("Invoice paid \u2014 cancelling all pending jobs", {
+  log20.info("Invoice paid \u2014 cancelling all pending jobs", {
     invoiceId: event.invoiceId
   });
   const { cancelPendingWhatsAppJobs: cancelPendingWhatsAppJobs2 } = await Promise.resolve().then(() => (init_whatsapp_queue(), whatsapp_queue_exports));
@@ -2182,7 +2271,7 @@ async function onInvoicePaid(event) {
     cancelPendingWhatsAppJobs2(event.invoiceId),
     cancelPendingSMSJobs2(event.invoiceId)
   ]);
-  log19.info("Pending jobs cancelled for paid invoice", {
+  log20.info("Pending jobs cancelled for paid invoice", {
     invoiceId: event.invoiceId,
     emailsCancelled,
     overdueChecksCancelled,
@@ -2195,14 +2284,14 @@ function registerNotificationSubscribers() {
   eventBus.on("invoice.payment_due", onInvoicePaymentDue);
   eventBus.on("invoice.overdue", onInvoiceOverdue);
   eventBus.on("invoice.paid", onInvoicePaid);
-  log19.info("Notification subscribers registered");
+  log20.info("Notification subscribers registered");
 }
 
 // src/modules/events/audit.subscriber.ts
 init_event_bus();
 init_prisma();
 init_logger();
-var log20 = logger.child({ module: "audit-subscriber" });
+var log21 = logger.child({ module: "audit-subscriber" });
 async function onInvoiceCreated2(event) {
   await prisma.invoiceEvent.create({
     data: {
@@ -2259,30 +2348,30 @@ function registerAuditSubscribers() {
   eventBus.on("invoice.payment_due", onInvoicePaymentDue2);
   eventBus.on("invoice.overdue", onInvoiceOverdue2);
   eventBus.on("invoice.paid", onInvoicePaid2);
-  log20.info("Audit subscribers registered");
+  log21.info("Audit subscribers registered");
 }
 
 // src/modules/events/event-registry.ts
 init_logger();
-var log21 = logger.child({ module: "event-registry" });
+var log22 = logger.child({ module: "event-registry" });
 var registered = false;
 function registerAllEventHandlers() {
   if (registered) {
-    log21.info("Event handlers already registered, skipping");
+    log22.info("Event handlers already registered, skipping");
     return;
   }
   registerNotificationSubscribers();
   registerAuditSubscribers();
   registered = true;
-  log21.info("All event handlers registered");
+  log22.info("All event handlers registered");
 }
 
 // src/workers/worker-entry.ts
 init_redis();
 init_logger();
-var log22 = logger.child({ module: "worker-entry" });
+var log23 = logger.child({ module: "worker-entry" });
 async function main() {
-  log22.info("Starting worker process...", {
+  log23.info("Starting worker process...", {
     pid: process.pid,
     nodeVersion: process.version,
     env: process.env.NODE_ENV || "development"
@@ -2292,27 +2381,29 @@ async function main() {
   const overdueCheckWorker = startOverdueCheckWorker(10);
   const whatsappWorker = startWhatsAppWorker();
   const smsWorker = startSMSWorker();
-  log22.info("All workers started successfully", {
-    workers: ["email", "overdue-check", "whatsapp", "sms"]
+  const outboxWorker = startOutboxWorker();
+  log23.info("All workers started successfully", {
+    workers: ["email", "overdue-check", "whatsapp", "sms", "outbox"]
   });
   let isShuttingDown = false;
   async function shutdown(signal) {
     if (isShuttingDown) return;
     isShuttingDown = true;
-    log22.info(`Received ${signal}, shutting down gracefully...`);
+    log23.info(`Received ${signal}, shutting down gracefully...`);
     try {
       await Promise.allSettled([
         emailWorker.close(),
         overdueCheckWorker.close(),
         whatsappWorker.close(),
-        smsWorker.close()
+        smsWorker.close(),
+        outboxWorker.close()
       ]);
-      log22.info("Workers closed");
+      log23.info("Workers closed");
       await disconnectRedis();
-      log22.info("Graceful shutdown complete");
+      log23.info("Graceful shutdown complete");
       process.exit(0);
     } catch (err) {
-      log22.error("Error during shutdown", {
+      log23.error("Error during shutdown", {
         error: err instanceof Error ? err.message : String(err)
       });
       process.exit(1);
@@ -2321,19 +2412,19 @@ async function main() {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("uncaughtException", (err) => {
-    log22.error("Uncaught exception in worker process", {
+    log23.error("Uncaught exception in worker process", {
       error: err.message,
       stack: err.stack
     });
   });
   process.on("unhandledRejection", (reason) => {
-    log22.error("Unhandled rejection in worker process", {
+    log23.error("Unhandled rejection in worker process", {
       error: reason instanceof Error ? reason.message : String(reason)
     });
   });
 }
 main().catch((err) => {
-  log22.error("Fatal error starting workers", {
+  log23.error("Fatal error starting workers", {
     error: err instanceof Error ? err.message : String(err),
     stack: err instanceof Error ? err.stack : void 0
   });

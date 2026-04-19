@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { Prisma } from '@prisma/client'
+import { generateCashflowForecast } from '@/modules/payment/cashflow-forecast'
 
 const log = logger.child({ module: 'dashboard-controller' })
 
@@ -10,32 +11,20 @@ const log = logger.child({ module: 'dashboard-controller' })
 export async function getDashboard(req: Request, res: Response): Promise<void> {
   try {
     const now = new Date()
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [
-      paidInvoices,
-      unpaidInvoices,
-      overdueInvoices,
-      totalPendingResult,
-      totalCollectedResult,
-      recentInvoices,
-    ] = await Promise.all([
-      prisma.invoice.count({
-        where: { userId: req.user!.userId, status: 'PAID' },
-      }),
-      prisma.invoice.count({
-        where: { userId: req.user!.userId, status: 'UNPAID' },
-      }),
-      prisma.invoice.count({
-        where: { userId: req.user!.userId, status: 'UNPAID', dueDate: { lt: now } },
-      }),
-      prisma.invoice.aggregate({
-        where: { userId: req.user!.userId, status: 'UNPAID' },
-        _sum: { amount: true },
-      }),
-      prisma.invoice.aggregate({
-        where: { userId: req.user!.userId, status: 'PAID' },
-        _sum: { amount: true },
-      }),
+    const [aggregatesResult, recentInvoices, cashflowForecast] = await Promise.all([
+      prisma.$queryRaw<any[]>`
+        SELECT 
+          COUNT(CASE WHEN status::text = 'PAID' THEN 1 END)::int AS "paidInvoices",
+          COUNT(CASE WHEN status::text = 'UNPAID' THEN 1 END)::int AS "unpaidInvoices",
+          COUNT(CASE WHEN status::text = 'UNPAID' AND "dueDate" < ${now} THEN 1 END)::int AS "overdueInvoices",
+          COALESCE(SUM(CASE WHEN status::text = 'UNPAID' THEN amount ELSE 0 END), 0) AS "totalPendingAmount",
+          COALESCE(SUM(CASE WHEN status::text = 'PAID' THEN amount ELSE 0 END), 0) AS "totalCollectedAmount",
+          COALESCE(SUM(CASE WHEN status::text = 'PAID' AND "updatedAt" >= ${firstOfMonth} AND "reminderStage" > 0 THEN amount ELSE 0 END), 0) AS "recoveredThisMonth"
+        FROM "Invoice"
+        WHERE "userId" = CAST(${req.user!.userId} AS uuid)
+      `,
       prisma.invoice.findMany({
         where: { userId: req.user!.userId },
         orderBy: { createdAt: 'desc' },
@@ -51,15 +40,19 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
           },
         },
       }),
+      generateCashflowForecast(req.user!.userId),
     ])
 
-    const dueInvoices = unpaidInvoices - overdueInvoices
+    const agg = aggregatesResult[0] || {}
 
-    const toNumber = (val: Prisma.Decimal | number | null) =>
-      val ? parseFloat(val.toString()) : 0
+    const paidInvoices = Number(agg.paidInvoices) || 0
+    const unpaidInvoices = Number(agg.unpaidInvoices) || 0
+    const overdueInvoices = Number(agg.overdueInvoices) || 0
+    const dueInvoices = Math.max(0, unpaidInvoices - overdueInvoices)
 
-    const totalPendingAmount = toNumber(totalPendingResult._sum.amount)
-    const totalCollectedAmount = toNumber(totalCollectedResult._sum.amount)
+    const totalPendingAmount = parseFloat(agg.totalPendingAmount?.toString() || '0')
+    const totalCollectedAmount = parseFloat(agg.totalCollectedAmount?.toString() || '0')
+    const recoveredThisMonth = parseFloat(agg.recoveredThisMonth?.toString() || '0')
 
     log.info('Dashboard query result', {
       userId: req.user!.userId,
@@ -77,6 +70,10 @@ export async function getDashboard(req: Request, res: Response): Promise<void> {
       totalPendingAmount,
       totalCollectedAmount,
       recentInvoices,
+      cashflowForecast,
+      antiChurn: {
+        recoveredThisMonth
+      }
     })
   } catch (error) {
     log.error('Dashboard error', { error: error instanceof Error ? error.message : String(error) })

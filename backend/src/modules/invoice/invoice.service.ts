@@ -34,61 +34,89 @@ interface CreateInvoiceData {
  * The event triggers downstream scheduling of reminders.
  */
 export async function createInvoice(data: CreateInvoiceData) {
-  const invoice = await prisma.invoice.create({
-    data: {
-      userId: data.userId,
-      clientId: data.clientId || null,
-      clientName: data.clientName,
-      clientEmail: data.clientEmail,
-      amount: new Prisma.Decimal(data.amount.toFixed(2)),
-      dueDate: data.dueDate,
-      description: data.description || null,
-      whatsappNumber: data.whatsappNumber || null,
-      smsNumber: data.smsNumber || null,
-      chasingProfile: (data.chasingProfile as ChasingProfile) || ChasingProfile.NORMAL,
-      contactChannel: (data.contactChannel as ContactChannel) || ContactChannel.EMAIL,
-      reminderTone: (data.reminderTone as any) || 'PROFESSIONAL',
-      chaseUntilPaid: data.chaseUntilPaid || false,
-      paymentLink: {
-        create: {}
-      }
-    },
-    include: {
-      paymentLink: true
+  return prisma.$transaction(async (tx) => {
+    let clientId = data.clientId
+
+    // Ensure orphan invoices are linked by upserting the client record automatically
+    if (!clientId) {
+      const client = await tx.client.upsert({
+        where: {
+          userId_email: {
+            userId: data.userId,
+            email: data.clientEmail,
+          }
+        },
+        update: {
+          name: data.clientName,
+        },
+        create: {
+          userId: data.userId,
+          name: data.clientName,
+          email: data.clientEmail,
+        }
+      })
+      clientId = client.id
     }
+
+    const invoice = await tx.invoice.create({
+      data: {
+        userId: data.userId,
+        clientId: clientId || null,
+        clientName: data.clientName,
+        clientEmail: data.clientEmail,
+        amount: new Prisma.Decimal(data.amount.toFixed(2)),
+        dueDate: data.dueDate,
+        description: data.description || null,
+        whatsappNumber: data.whatsappNumber || null,
+        smsNumber: data.smsNumber || null,
+        chasingProfile: (data.chasingProfile as ChasingProfile) || ChasingProfile.NORMAL,
+        contactChannel: (data.contactChannel as ContactChannel) || ContactChannel.EMAIL,
+        reminderTone: (data.reminderTone as any) || 'PROFESSIONAL',
+        chaseUntilPaid: data.chaseUntilPaid || false,
+        paymentLink: {
+          create: {}
+        }
+      },
+      include: {
+        paymentLink: true
+      }
+    })
+
+    const user = await tx.user.findUnique({
+      where: { id: data.userId },
+      select: { customIntervals: true }
+    })
+
+    log.info('Invoice created', { invoiceId: invoice.id, userId: data.userId })
+
+    // Fire event — write to transactional outbox
+    const payload = {
+      invoiceId: invoice.id,
+      userId: invoice.userId,
+      clientEmail: invoice.clientEmail,
+      clientName: invoice.clientName,
+      amount: invoice.amount.toString(), // Preserve decimal precision
+      dueDate: invoice.dueDate,
+      whatsappNumber: invoice.whatsappNumber,
+      smsNumber: invoice.smsNumber,
+      chasingProfile: invoice.chasingProfile,
+      contactChannel: invoice.contactChannel,
+      paymentLinkToken: invoice.paymentLink?.token,
+      reminderTone: invoice.reminderTone,
+      chaseUntilPaid: invoice.chaseUntilPaid,
+      chaseIntervalDays: invoice.chaseIntervalDays,
+      customIntervals: user?.customIntervals,
+    }
+
+    await tx.outboxEvent.create({
+      data: {
+        eventType: 'invoice.created',
+        payload: payload as any,
+      }
+    })
+
+    return invoice
   })
-
-  const user = await prisma.user.findUnique({
-    where: { id: data.userId },
-    select: { customIntervals: true }
-  })
-
-  log.info('Invoice created', { invoiceId: invoice.id, userId: data.userId })
-
-  // Fire event — notification module will handle scheduling
-  const amount = invoice.amount instanceof Prisma.Decimal
-    ? invoice.amount.toNumber()
-    : Number(invoice.amount)
-
-  eventBus.emit('invoice.created', {
-    invoiceId: invoice.id,
-    userId: invoice.userId,
-    clientEmail: invoice.clientEmail,
-    clientName: invoice.clientName,
-    amount,
-    dueDate: invoice.dueDate,
-    whatsappNumber: invoice.whatsappNumber,
-    smsNumber: invoice.smsNumber,
-    chasingProfile: invoice.chasingProfile,
-    contactChannel: invoice.contactChannel,
-    paymentLinkToken: invoice.paymentLink?.token,
-    reminderTone: invoice.reminderTone,
-    chaseUntilPaid: invoice.chaseUntilPaid,
-    chaseIntervalDays: invoice.chaseIntervalDays,
-    customIntervals: user?.customIntervals,
-  })
-
-  return invoice
 }
 
 /**
@@ -102,32 +130,39 @@ export async function createInvoice(data: CreateInvoiceData) {
  * reminder and overdue-check jobs for this invoice.
  */
 export async function markInvoiceAsPaid(invoiceId: string, userId: string) {
-  // Atomic transition: only update if currently UNPAID
-  const result = await prisma.invoice.updateMany({
-    where: {
-      id: invoiceId,
-      userId,
-      status: 'UNPAID',
-    },
-    data: {
-      status: 'PAID',
-      reminderStage: 0,
-      updatedAt: new Date(),
-    },
+  return prisma.$transaction(async (tx) => {
+    // Atomic transition: only update if currently UNPAID
+    const result = await tx.invoice.updateMany({
+      where: {
+        id: invoiceId,
+        userId,
+        status: 'UNPAID',
+      },
+      data: {
+        status: 'PAID',
+        reminderStage: 0,
+        updatedAt: new Date(),
+      },
+    })
+
+    if (result.count === 0) {
+      log.info('Invoice already paid or not found', { invoiceId, userId })
+      return null
+    }
+
+    log.info('Invoice marked as paid', { invoiceId, userId })
+
+    // Fire event — write to transactional outbox
+    await tx.outboxEvent.create({
+      data: {
+        eventType: 'invoice.paid',
+        payload: { invoiceId, userId },
+      }
+    })
+
+    // Return updated invoice
+    return tx.invoice.findUnique({ where: { id: invoiceId } })
   })
-
-  if (result.count === 0) {
-    log.info('Invoice already paid or not found', { invoiceId, userId })
-    return null
-  }
-
-  log.info('Invoice marked as paid', { invoiceId, userId })
-
-  // Fire event — notification module cancels pending jobs
-  eventBus.emit('invoice.paid', { invoiceId, userId })
-
-  // Return updated invoice
-  return prisma.invoice.findUnique({ where: { id: invoiceId } })
 }
 
 /**
@@ -168,30 +203,36 @@ export async function markInvoiceAsUnpaid(invoiceId: string, userId: string) {
  * and wasted retries in WhatsApp/SMS workers.
  */
 export async function deleteInvoice(invoiceId: string, userId: string) {
-  // Verify ownership
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: invoiceId, userId },
-  })
+  return prisma.$transaction(async (tx) => {
+    // Verify ownership
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, userId },
+    })
 
-  if (!invoice) {
-    return null
-  }
-
-  // Cancel all pending jobs by emitting the paid event
-  // (the notification subscriber handles cancellation across all queues)
-  if (invoice.status === 'UNPAID') {
-    try {
-      eventBus.emit('invoice.paid', { invoiceId, userId })
-    } catch (err) {
-      log.error('Failed to emit cleanup event before deletion', { invoiceId, error: err })
+    if (!invoice) {
+      return null
     }
-  }
 
-  // Delete the invoice (cascade deletes ReminderLogs via schema)
-  await prisma.invoice.delete({ where: { id: invoiceId } })
+    // Cancel all pending jobs by emitting the paid event to outbox
+    if (invoice.status === 'UNPAID') {
+      try {
+        await tx.outboxEvent.create({
+          data: {
+            eventType: 'invoice.paid',
+            payload: { invoiceId, userId },
+          }
+        })
+      } catch (err) {
+        log.error('Failed to write cleanup event to outbox before deletion', { invoiceId, error: err })
+      }
+    }
 
-  log.info('Invoice deleted with job cleanup', { invoiceId, userId })
-  return invoice
+    // Delete the invoice (cascade deletes ReminderLogs via schema)
+    await tx.invoice.delete({ where: { id: invoiceId } })
+
+    log.info('Invoice deleted with job cleanup', { invoiceId, userId })
+    return invoice
+  })
 }
 
 /**
@@ -271,114 +312,61 @@ export async function updateInvoiceDetails(id: string, userId: string, updateDat
  * Directly calls email/SMS senders (bypasses BullMQ since it's user-initiated).
  */
 export async function sendManualReminder(invoiceId: string, userId: string) {
-  const invoice = await prisma.invoice.findFirst({
-    where: { id: invoiceId, userId },
-    include: { paymentLink: true },
-  })
-
-  if (!invoice) throw new Error('Invoice not found')
-  if (invoice.status === 'PAID') throw new Error('Cannot send reminder for a paid invoice')
-
-  const { sendEmail } = await import('@/modules/communication/email-sender')
-  const { generateMessage } = await import('@/modules/ai/message-generator')
-
-  const amount = invoice.amount instanceof Prisma.Decimal
-    ? invoice.amount.toNumber()
-    : Number(invoice.amount)
-
-  const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const paymentLink = invoice.paymentLink?.token ? `${baseUrl}/pay/${invoice.paymentLink.token}` : undefined
-
-  const generated = await generateMessage({
-    clientName: invoice.clientName,
-    amount,
-    dueDate: invoice.dueDate.toISOString(),
-    stage: invoice.reminderStage || 1,
-    daysOverdue,
-    paymentLink,
-    tone: (invoice.reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
-  })
-
-  const channelsUsed: string[] = []
-  const errors: string[] = []
-
-  // Send email
-  const shouldSendEmail = ['EMAIL', 'BOTH', 'EMAIL_AND_SMS', 'ALL'].includes(invoice.contactChannel)
-  if (shouldSendEmail) {
-    const emailResult = await sendEmail({
-      userId,
-      to: invoice.clientEmail,
-      subject: generated.subject,
-      htmlBody: generated.htmlBody,
-      plainText: generated.plainText,
+  return prisma.$transaction(async (tx) => {
+    const invoice = await tx.invoice.findFirst({
+      where: { id: invoiceId, userId },
+      include: { paymentLink: true },
     })
-    if (emailResult.success) {
-      channelsUsed.push('email')
-    } else {
-      errors.push(`Email: ${emailResult.error}`)
-    }
-  }
 
-  // Send SMS
-  const shouldSendSms = ['SMS', 'EMAIL_AND_SMS', 'ALL'].includes(invoice.contactChannel) && invoice.smsNumber
-  if (shouldSendSms) {
-    try {
-      const { sendSMS } = await import('@/modules/communication/sms-sender')
-      const smsResult = await sendSMS({ userId, to: invoice.smsNumber!, message: generated.plainText || generated.subject })
-      if (smsResult.success) {
-        channelsUsed.push('sms')
-      } else {
-        errors.push(`SMS: ${smsResult.error}`)
+    if (!invoice) throw new Error('Invoice not found')
+    if (invoice.status === 'PAID') throw new Error('Cannot send reminder for a paid invoice')
+
+    const daysOverdue = Math.max(0, Math.floor((Date.now() - new Date(invoice.dueDate).getTime()) / (1000 * 60 * 60 * 24)))
+    const nextStage = Math.max(1, invoice.reminderStage + 1)
+
+    const payload = {
+      invoiceId: invoice.id,
+      userId: invoice.userId,
+      clientEmail: invoice.clientEmail,
+      clientName: invoice.clientName,
+      amount: invoice.amount.toString(),
+      dueDate: invoice.dueDate,
+      daysOverdue,
+      stage: nextStage,
+      contactChannel: invoice.contactChannel,
+      whatsappNumber: invoice.whatsappNumber,
+      smsNumber: invoice.smsNumber,
+      paymentLinkToken: invoice.paymentLink?.token,
+      reminderTone: invoice.reminderTone,
+      chaseUntilPaid: invoice.chaseUntilPaid,
+      chaseIntervalDays: invoice.chaseIntervalDays,
+    }
+
+    // Queue reminder using outbox
+    await tx.outboxEvent.create({
+      data: {
+        eventType: 'invoice.overdue',
+        payload: payload as any,
       }
-    } catch (err) {
-      errors.push(`SMS: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  if (channelsUsed.length === 0 && !shouldSendEmail && !shouldSendSms) {
-    // No channels configured, just send email as fallback
-    const emailResult = await sendEmail({
-      userId,
-      to: invoice.clientEmail,
-      subject: generated.subject,
-      htmlBody: generated.htmlBody,
-      plainText: generated.plainText,
     })
-    if (emailResult.success) channelsUsed.push('email')
-    else errors.push(`Email: ${emailResult.error}`)
-  }
 
-  // Log the result
-  const status = channelsUsed.length > 0 ? 'sent' : 'failed'
-  await prisma.reminderLog.create({
-    data: {
-      invoiceId,
-      stage: 0, // 0 = manual
-      status,
-      channel: channelsUsed.join(',') || 'none',
-      tone: invoice.reminderTone,
-      messageBody: generated.plainText || generated.subject,
-      error: errors.length > 0 ? errors.join('; ') : null,
-    },
+    // Create audit event
+    await tx.invoiceEvent.create({
+      data: {
+        invoiceId,
+        eventType: 'manual_reminder_queued',
+        metadata: { daysOverdue, stage: nextStage },
+      },
+    })
+
+    log.info('Manual reminder queued', { invoiceId, nextStage })
+
+    return { success: true, channels: [], errors: [], message: 'Reminder queued' }
   })
-
-  // Create audit event
-  await prisma.invoiceEvent.create({
-    data: {
-      invoiceId,
-      eventType: 'manual_reminder_sent',
-      metadata: { channels: channelsUsed, errors, daysOverdue },
-    },
-  })
-
-  log.info('Manual reminder sent', { invoiceId, channelsUsed, errors })
-
-  return { success: channelsUsed.length > 0, channels: channelsUsed, errors }
 }
 
 /**
- * Get full reminder history for an invoice.
+ * Get full reminder history for an invoice, including tracking and audit events.
  */
 export async function getReminderHistory(invoiceId: string, userId: string) {
   // Verify ownership
@@ -388,8 +376,34 @@ export async function getReminderHistory(invoiceId: string, userId: string) {
   })
   if (!invoice) return null
 
-  return prisma.reminderLog.findMany({
+  const reminders = await prisma.reminderLog.findMany({
     where: { invoiceId },
     orderBy: { sentAt: 'desc' },
   })
+
+  const trackings = await prisma.invoiceTracking.findMany({
+    where: { invoiceId },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const events = await prisma.invoiceEvent.findMany({
+    where: { 
+      invoiceId,
+      eventType: {
+        notIn: ['email_opened', 'link_clicked', 'payment_page_viewed']
+      }
+    },
+    orderBy: { createdAt: 'desc' },
+  })
+
+  const unifiedHistory: any[] = []
+
+  reminders.forEach((r) => unifiedHistory.push({ ...r, _type: 'reminder', _date: r.sentAt }))
+  trackings.forEach((t) => unifiedHistory.push({ ...t, _type: 'tracking', _date: t.createdAt }))
+  events.forEach((e) => unifiedHistory.push({ ...e, _type: 'event', _date: e.createdAt }))
+
+  // Sort unified history by date descending
+  unifiedHistory.sort((a, b) => b._date.getTime() - a._date.getTime())
+
+  return unifiedHistory
 }

@@ -114,7 +114,7 @@ export async function updateUserTier(req: Request, res: Response): Promise<void>
     }
 
     await prisma.user.update({
-      where: { id },
+      where: { id: id as string },
       data: { subscriptionTier: tier }
     })
 

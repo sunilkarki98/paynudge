@@ -22,6 +22,14 @@ interface DashboardData {
       riskScore: string
     }
   }>
+  cashflowForecast: {
+    projectedCashflow: number
+    atRiskAmount: number
+    confidence: number
+  }
+  antiChurn: {
+    recoveredThisMonth: number
+  }
 }
 
 function formatCurrency(amount: number | string): string {
@@ -83,8 +91,25 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* Anti-Churn Banner */}
+      {data.antiChurn.recoveredThisMonth > 0 && (
+        <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-xl p-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="bg-emerald-100 text-emerald-600 p-2 rounded-full">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-emerald-800">PayNudge Intelligence</p>
+              <p className="text-xs text-emerald-600">Smart reminders have recovered <strong>{formatCurrency(data.antiChurn.recoveredThisMonth)}</strong> this month.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Action Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 stagger-children">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 stagger-children">
         <StatsCard
           title="Paid Invoices"
           value={data.paidInvoices}
@@ -138,6 +163,17 @@ export default function DashboardPage() {
             </svg>
           }
           gradient="from-emerald-400 to-teal-500"
+        />
+        <StatsCard
+          title="30-Day Projection"
+          value={formatCurrency(data.cashflowForecast.projectedCashflow)}
+          subtitle={`At Risk: ${formatCurrency(data.cashflowForecast.atRiskAmount)}`}
+          icon={
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          }
+          gradient="from-blue-500 to-cyan-500"
         />
       </div>
 

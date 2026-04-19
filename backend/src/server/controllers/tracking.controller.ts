@@ -61,5 +61,9 @@ async function trackOpen(invoiceId: string, stage: string | null, req: Request) 
     },
   })
 
+  // Emit event to update behavioral intelligence
+  const { eventBus } = await import('@/modules/events/event-bus')
+  eventBus.emit('invoice.tracking_event', { invoiceId, event: 'email_opened' })
+
   log.info('Email open tracked', { invoiceId, stage })
 }

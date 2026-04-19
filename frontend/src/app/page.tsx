@@ -21,6 +21,7 @@ import {
   CheckCircle,
   Eye,
   Smartphone,
+  Send,
 } from 'lucide-react'
 
 export default function LandingPage() {
@@ -31,6 +32,38 @@ export default function LandingPage() {
       router.push('/dashboard')
     }
   }, [user, isLoading, router])
+
+  // #region agent log
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const q = new URLSearchParams(window.location.search)
+    const err = q.get('error')
+    const code = q.get('error_code')
+    const desc = q.get('error_description')
+    const hash = window.location.hash || ''
+    const hasAuthErr = Boolean(err || hash.includes('error='))
+    if (!hasAuthErr) return
+    fetch('http://127.0.0.1:7359/ingest/3b0c2916-fdb5-45b8-9836-ac0638fd59ae', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '964b3b' },
+      body: JSON.stringify({
+        sessionId: '964b3b',
+        runId: 'landing-oauth-return',
+        hypothesisId: 'H-flow',
+        location: 'frontend/src/app/page.tsx',
+        message: 'Landing URL carried auth error params',
+        data: {
+          error: err,
+          error_code: code,
+          error_description: desc,
+          hashHasError: hash.includes('error='),
+          hashLen: hash.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [])
+  // #endregion
 
   if (isLoading) {
     return (
@@ -85,47 +118,28 @@ export default function LandingPage() {
           <div className="max-w-4xl mx-auto text-center space-y-8 animate-fade-in">
             <div className="inline-flex items-center px-4 py-2 rounded-full glass-card border border-primary-500/30 text-primary-400 text-sm font-medium mb-4">
               <Zap className="w-4 h-4 mr-2" />
-              AI-generated reminders via Gemini
+              Behavioral Payment Intelligence
             </div>
             <h1 className="text-5xl lg:text-7xl font-bold tracking-tight leading-[1.1]">
-              Automate your<br />
+              Get paid faster without<br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-400 to-accent-400">
-                payment follow-ups.
+                the awkward follow-ups.
               </span>
             </h1>
             <p className="text-lg lg:text-xl text-text-primary max-w-2xl mx-auto leading-relaxed font-medium">
-              Create an invoice. Set a tone. Invoice Chaser automatically sends escalating reminders
-              via Email and SMS until your client pays — so you don&apos;t have to ask.
+              Stop manually chasing clients. Our AI analyzes payment behavior and deploys perfectly-toned reminders via your own Gmail and SMS until you get paid—protecting your client relationships while securing your cashflow.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
               <Link href="/register" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-bold text-lg hover:shadow-2xl hover:shadow-primary-500/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">
-                Start Free <ArrowRight className="w-5 h-5" />
+                Start Free Trial <ArrowRight className="w-5 h-5" />
               </Link>
               <a href="#how-it-works" className="w-full sm:w-auto px-8 py-4 rounded-2xl glass-card font-medium text-text-primary hover:bg-surface-raised transition-all">
                 See how it works ↓
               </a>
             </div>
             <p className="text-sm text-text-muted font-medium">
-              No credit card required. Set up in under 2 minutes.
+              7-Day Free Trial. No credit card required.
             </p>
-          </div>
-        </section>
-
-        {/* ───────── PRODUCT SCREENSHOT ───────── */}
-        <section className="relative pt-4 lg:pt-8 pb-0 px-6">
-          <div className="max-w-5xl mx-auto">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-primary-500/10 border border-surface-border">
-              <Image
-                src="/dashboard-preview-new.png"
-                alt="Invoice Chaser Dashboard — track invoices, send AI-powered reminders, and get paid faster"
-                width={1200}
-                height={750}
-                className="w-full h-auto"
-                priority
-              />
-              {/* Fade overlay at bottom */}
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-background to-transparent" />
-            </div>
           </div>
         </section>
 
@@ -169,7 +183,7 @@ export default function LandingPage() {
                   <span className="absolute -top-2 -right-2 w-7 h-7 rounded-full bg-emerald-500 text-white text-sm font-bold flex items-center justify-center">3</span>
                 </div>
                 <h3 className="text-xl font-bold">Get Paid</h3>
-                <p className="text-text-primary font-medium max-w-xs">AI sends escalating reminders on schedule. When they pay, all pending reminders cancel instantly.</p>
+                <p className="text-text-primary font-medium max-w-xs">AI deploys strategic nudges on schedule. When they pay, all pending nudges cancel instantly.</p>
               </div>
             </div>
           </div>
@@ -190,19 +204,16 @@ export default function LandingPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-primary-400 to-primary-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-md">
                   <Zap className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-text-primary mb-2">AI-Written Reminders</h3>
+                <h3 className="text-lg font-bold text-text-primary mb-2">Behavioral Nudges</h3>
                 <p className="text-text-secondary text-sm font-medium leading-relaxed">
-                  Stop writing awkward follow-ups. Our AI drafts polite, professional, or firm reminders based on how late they are.
+                  Stop writing awkward follow-ups. Our AI drafts strategic, perfectly timed nudges based on client payment behavior.
                 </p>
               </div>
 
               {/* Feature 2: Multi-Channel */}
               <div className="glass-card p-6 rounded-3xl hover:-translate-y-2 transition-all duration-300 group shadow-lg hover:shadow-accent-500/10">
                 <div className="w-12 h-12 bg-gradient-to-br from-accent-400 to-accent-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 group-hover:-rotate-3 transition-transform shadow-md">
-                  <div className="flex items-center gap-1.5">
-                    <Mail className="w-4 h-4" />
-                    <Smartphone className="w-4 h-4" />
-                  </div>
+                  <Send className="w-6 h-6" />
                 </div>
                 <h3 className="text-lg font-bold text-text-primary mb-2">Email + SMS Delivery</h3>
                 <p className="text-text-secondary text-sm font-medium leading-relaxed">
@@ -215,9 +226,9 @@ export default function LandingPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-emerald-600 text-white rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform shadow-md">
                   <Shield className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-text-primary mb-2">Send from Your Gmail</h3>
+                <h3 className="text-lg font-bold text-text-primary mb-2">Professional Shield System</h3>
                 <p className="text-text-secondary text-sm font-medium leading-relaxed">
-                  No more landing in spam as "noreply@bot.com". Link Google OAuth and send reminders straight from your real inbox.
+                  No more landing in spam as "noreply@bot.com". Link Google OAuth and send nudges straight from your real inbox, protecting your relationship.
                 </p>
               </div>
 
@@ -250,7 +261,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-lg font-bold text-text-primary mb-2">Open & Click Tracking</h3>
                 <p className="text-text-secondary text-sm font-medium leading-relaxed">
-                  Stop wondering if they saw it. Invisible tracking pixels tell you exactly when a client opens your reminder or clicks the link.
+                  Stop wondering if they saw it. Invisible tracking pixels tell you exactly when a client opens your nudge or clicks the link.
                 </p>
               </div>
 
@@ -269,18 +280,18 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              {/* Free Plan */}
+              {/* Free Trial */}
               <div className="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform">
                 <div className="mb-6">
-                  <h3 className="text-xl font-bold text-text-primary">Free</h3>
-                  <p className="text-text-secondary text-sm mt-1">Perfect to get started</p>
+                  <h3 className="text-xl font-bold text-text-primary">7-Day Free Trial</h3>
+                  <p className="text-text-secondary text-sm mt-1">Full access to try it out</p>
                 </div>
                 <div className="mb-8">
                   <span className="text-4xl font-bold text-text-primary">$0</span>
-                  <span className="text-text-muted text-sm ml-1">/month</span>
+                  <span className="text-text-muted text-sm ml-1">for 7 days</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Up to 10 active invoices', 'AI-generated reminders', 'Email delivery', 'Invoice PDF upload', 'Risk scoring', 'Payment link tracking'].map((feature) => (
+                  {['Unlimited invoices', 'Behavioral intelligence engine', 'Email & SMS delivery', 'Invoice PDF upload', 'Risk scoring', 'Payment link tracking'].map((feature) => (
                     <li key={feature} className="flex items-center gap-3 text-sm text-text-secondary font-medium">
                       <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
                       {feature}
@@ -288,7 +299,7 @@ export default function LandingPage() {
                   ))}
                 </ul>
                 <Link href="/register" className="block w-full text-center py-3 rounded-xl border border-surface-border font-semibold text-text-primary hover:bg-surface-raised transition-colors shadow-sm">
-                  Get Started Free
+                  Start Free Trial
                 </Link>
               </div>
 
@@ -299,14 +310,14 @@ export default function LandingPage() {
                 </div>
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-text-primary">Pro</h3>
-                  <p className="text-text-secondary text-sm mt-1">For serious freelancers</p>
+                  <p className="text-text-secondary text-sm mt-1">For serious freelancers & agencies</p>
                 </div>
                 <div className="mb-8">
                   <span className="text-4xl font-bold text-text-primary">$12</span>
                   <span className="text-text-muted text-sm ml-1">/month</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited invoices', 'Everything in Free', 'SMS via Twilio', 'Chase-until-paid automation', 'Custom reminder intervals', 'Priority support'].map((feature) => (
+                  {['Unlimited invoices', 'Everything in Free Trial', 'SMS via Twilio', 'Chase-until-paid automation', 'Custom nudge intervals', 'Priority support'].map((feature) => (
                     <li key={feature} className="flex items-center gap-3 text-sm text-text-secondary font-medium">
                       <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
                       {feature}

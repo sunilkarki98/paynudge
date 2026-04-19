@@ -14,6 +14,7 @@ export interface BaseReminderJobData {
 
 export interface BusinessLogicResult {
   plainText: string
+  persuasionStrategy?: string
 }
 
 /**
@@ -108,6 +109,7 @@ export async function withIdempotencyGuard<T extends BaseReminderJobData>(
         channel,
         tone: reminderTone,
         messageBody: result.plainText,
+        persuasionStrategy: result.persuasionStrategy,
       },
     })
 
@@ -139,14 +141,16 @@ export async function withIdempotencyGuard<T extends BaseReminderJobData>(
     })
     
     if (currentInvoice) {
-      await prisma.invoice.update({
-        where: { id: invoiceId },
-        data: {
-          idempotencyKeys: currentInvoice.idempotencyKeys.filter((k: string) => k !== idempotencyKey),
-          reminderStage: Math.max(0, stage - 1),
-          lastReminderSentAt: null,
-        },
-      })
+      await prisma.$transaction([
+        prisma.$executeRaw`UPDATE "Invoice" SET "idempotencyKeys" = array_remove("idempotencyKeys", ${idempotencyKey}) WHERE id = ${invoiceId}`,
+        prisma.invoice.update({
+          where: { id: invoiceId },
+          data: {
+            reminderStage: Math.max(0, stage - 1),
+            lastReminderSentAt: null,
+          },
+        })
+      ])
     }
 
     await prisma.reminderLog.create({

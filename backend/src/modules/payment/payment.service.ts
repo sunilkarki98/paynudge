@@ -45,6 +45,10 @@ export async function getPaymentLinkAndTrackView(token: string) {
         }
       })
 
+      // Emit event to update behavioral intelligence
+      const { eventBus } = await import('@/modules/events/event-bus')
+      eventBus.emit('invoice.tracking_event', { invoiceId: invoice.id, event: 'payment_page_viewed' })
+
       // Update click count
       await prisma.paymentLink.update({
         where: { id: paymentLink.id },

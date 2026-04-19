@@ -12,12 +12,16 @@ export interface MessageContext {
   clientName: string
   invoiceNumber?: string
   amount: number
-  dueDate: string
+  dueDate: string // ISO string or formatted date
+  stage: number   // 1=friendly, 2=check-in, 3=firm, 4=final
   daysOverdue?: number
-  stage: number // 1=due, 2=3day, 3=7day, 4=14day, 5+=recurring
   paymentLink?: string
-  senderName?: string
   tone: Tone
+  senderName?: string // Defaults to the user's name if available
+  behaviorProfile?: string
+  behaviorType?: string // The new behavioral intelligence type
+  overrideTone?: string
+  shieldMode?: boolean
 }
 
 export interface GeneratedMessage {
@@ -26,6 +30,8 @@ export interface GeneratedMessage {
   plainText: string
   smsText?: string // Short version for SMS (≤160 chars)
   source: 'llm' | 'template' // Which generator was used
+  persuasionStrategy?: string
+  toneUsed?: Tone
 }
 
 // ─── LLM Generator ──────────────────────────────────────
@@ -68,14 +74,58 @@ async function generateWithLLM(
   const model = ai.getGenerativeModel({ model: generatorModel })
 
   const toneInstructions = {
-    FRIENDLY: 'warm, casual, empathetic. Use conversational language. Assume good intent. Brief use of emoji is ok.',
-    PROFESSIONAL: 'formal, polite, direct. Business-like and respectful. No emoji. Clear and concise.',
-    FIRM: 'direct, serious, urgent. Mention potential consequences professionally. Still respectful but leave no ambiguity about urgency.',
+    FRIENDLY: 'Warm, casual, like a quick check-in from a friend. Very natural language, do not sound automated.',
+    PROFESSIONAL: 'Polite, direct, standard business email style. Keep it human but strictly professional.',
+    FIRM: 'Serious and urgent, but still human. Do not sound like a corporate collection agency, sound like a frustrated but professional contractor.',
+  }
+
+  let actualTone = ctx.tone
+
+  // Shield Mode strictly caps tone at PROFESSIONAL
+  if (ctx.shieldMode && actualTone === 'FIRM') {
+    actualTone = 'PROFESSIONAL'
+  }
+
+  if (ctx.overrideTone && ['FRIENDLY', 'PROFESSIONAL', 'FIRM'].includes(ctx.overrideTone)) {
+    actualTone = ctx.overrideTone as Tone
+  } else if (ctx.behaviorProfile === 'RELIABLE' && actualTone === 'FIRM') {
+    actualTone = 'PROFESSIONAL' // downgrade strictness for historically great clients
+  } else if (ctx.behaviorProfile === 'GHOST' && actualTone === 'FRIENDLY') {
+    actualTone = 'FIRM' // upgrade strictness for known ghosts
+  }
+  
+  if (ctx.shieldMode && actualTone === 'FIRM') {
+    actualTone = 'PROFESSIONAL' // Double check overriding doesn't bypass shield mode
+  }
+
+  const date = new Date()
+  const isEndOfMonth = date.getDate() > 25
+  const isStartOfMonth = date.getDate() <= 5
+
+  let reasonWhy = ''
+  if (actualTone === 'FRIENDLY' || actualTone === 'PROFESSIONAL') {
+    if (isEndOfMonth) {
+      reasonWhy = "I'm currently wrapping up my bookkeeping for the month and trying to close out open ledgers."
+    } else if (isStartOfMonth) {
+      reasonWhy = "I'm doing my start-of-month accounting reconciliation."
+    } else {
+      reasonWhy = "I am doing my weekly admin and bookkeeping."
+    }
+  } else if (actualTone === 'FIRM') {
+    reasonWhy = "I am finalizing my schedule and accounting. I cannot allocate further hours or lock in new project dates until past-due balances are cleared."
   }
 
   const stageContext = ctx.daysOverdue && ctx.daysOverdue > 0
     ? `The invoice is ${ctx.daysOverdue} days overdue.`
     : 'The invoice is due today or coming up soon.'
+
+  const behavioralContext = ctx.behaviorType 
+    ? `Client Behavioral Profile: ${ctx.behaviorType}. Adapt your psychological framing accordingly (e.g. if AVOIDANT, be extremely clear and set boundaries. If CASHFLOW_CONSTRAINED and amount > 5000, consider subtly suggesting they can split the payment).`
+    : ''
+
+  const shieldModeRules = ctx.shieldMode
+    ? `\n8. SHIELD MODE ACTIVE: You must actively vary the phrasing so it doesn't look like a template. Include a very human, slightly randomized conversational opening or closing.`
+    : ''
 
   const prompt = `You are writing a payment reminder email for a freelancer's invoicing system.
 
@@ -85,27 +135,28 @@ CONTEXT:
 - Amount: $${ctx.amount.toLocaleString()}
 - Due date: ${ctx.dueDate}
 - ${stageContext}
-- This is reminder stage ${ctx.stage} of the escalation sequence.
 - Sender: ${ctx.senderName || 'the freelancer'}
+- REAL-WORLD REASON FOR EMAILING TODAY (incorporate this organically): "${reasonWhy}"
 ${ctx.paymentLink ? `- Payment link: ${ctx.paymentLink}` : ''}
+${behavioralContext}
 
-TONE: ${ctx.tone} — ${toneInstructions[ctx.tone]}
+TONE: ${actualTone} — ${toneInstructions[actualTone]}
 
 RULES:
-1. Keep it SHORT (3-5 sentences max for the body)
-2. Do NOT be aggressive, threatening, or spammy
-3. Do NOT use legal threats or collection agency language
-4. Include the invoice amount and due date naturally
-5. If a payment link is provided, mention it as a convenient way to pay
-6. End with a professional sign-off line
-7. Do NOT include "Dear" or overly formal greetings — use "Hi {name}" or "Hello {name}"
-8. The email must work standalone without any attachments
+1. MUST sound 100% human-typed and organic, not automated. Do not use phrases like "This is a reminder".
+2. Keep it SHORT (2-4 sentences max for the body).
+3. Naturally mention the invoice amount and due date in passing.
+4. If a payment link is provided, include it organically (e.g., "Here's a link to settle it: [link]").
+5. End with a natural sign-off line (e.g., "Best,", "Thanks,", "Talk soon,"). Vary these so they aren't identical.
+6. Use natural greetings like "Hi {name}" or "Hey {name},".
+7. Make slight conversational variations so repeated messages don't feel robotic.${shieldModeRules}
 
 Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
 {
   "subject": "Email subject line",
   "body": "Plain text email body (just the message, no subject)",
-  "sms": "SMS version in under 155 characters"
+  "sms": "SMS version in under 155 characters",
+  "persuasionStrategy": "Short description of the behavioral strategy used (e.g., Loss Aversion Framing, Social Proof, Benefit of the Doubt)"
 }`
 
   const result = await model.generateContent(prompt)
@@ -119,7 +170,7 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
     cleaned = cleaned.replace(/^```\s*/, '').replace(/```\s*$/, '')
   }
 
-  let parsed: { subject: string; body: string; sms: string }
+  let parsed: { subject: string; body: string; sms: string; persuasionStrategy?: string }
   try {
     parsed = JSON.parse(cleaned)
   } catch {
@@ -131,6 +182,13 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
   if (!parsed.subject || !parsed.body) {
     log.warn('LLM returned incomplete response, falling back to template')
     return generateWithTemplate(ctx)
+  }
+
+  // Safety rail: Prevent LLM hallucinated essays from breaking the UI
+  let safePersuasionStrategy = parsed.persuasionStrategy
+  if (safePersuasionStrategy && safePersuasionStrategy.length > 60) {
+    log.warn('LLM returned overly long persuasion strategy, truncating', { length: safePersuasionStrategy.length })
+    safePersuasionStrategy = safePersuasionStrategy.substring(0, 57) + '...'
   }
 
   // Build HTML version
@@ -148,6 +206,8 @@ Respond in this exact JSON format (no markdown, no code blocks, just raw JSON):
     plainText: parsed.body,
     smsText: parsed.sms || undefined,
     source: 'llm',
+    persuasionStrategy: safePersuasionStrategy,
+    toneUsed: actualTone,
   }
 }
 
@@ -191,6 +251,8 @@ function generateWithTemplate(ctx: MessageContext): GeneratedMessage {
     plainText: body,
     smsText: sms.length <= 160 ? sms : sms.substring(0, 157) + '...',
     source: 'template',
+    persuasionStrategy: 'Standard Template (No AI)',
+    toneUsed: ctx.tone,
   }
 }
 
@@ -200,68 +262,68 @@ function getTemplateForStage(stage: number, tone: Tone): Template {
   const templates: Record<Tone, Record<number, Template>> = {
     FRIENDLY: {
       1: {
-        subject: 'Friendly reminder — Invoice {{invoiceNumber}} is due today',
-        body: `Hi {{clientName}},\n\nJust a quick heads-up that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}). No rush—just wanted to make sure it didn't slip through the cracks! 😊\n\nYou can pay quickly here: {{paymentLink}}\n\nThanks so much!`,
-        sms: 'Hi {{clientName}}! Reminder: Invoice {{invoiceNumber}} ({{amount}}) is due today. Thanks!',
+        subject: 'Quick check-in on Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nHope you're having a great week! Just a quick heads up that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}).\n\nIf you could process that when you have a moment, I'd really appreciate it. Here's a link to settle it: {{paymentLink}}\n\nTalk soon!`,
+        sms: 'Hey {{clientName}}! Just a quick heads up that invoice {{invoiceNumber}} for {{amount}} is due today. Thanks!',
       },
       2: {
-        subject: 'Checking in — Invoice {{invoiceNumber}} is {{daysOverdue}} days past due',
-        body: `Hi {{clientName}},\n\nHope you're doing well! I noticed invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past due. Totally understand if it slipped by — happens to all of us!\n\nYou can pay quickly here: {{paymentLink}}\n\nWould love to get this sorted. Let me know if you have any questions!`,
-        sms: 'Hi {{clientName}}, just checking in — invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Let me know!',
+        subject: 'Invoice {{invoiceNumber}} check-in',
+        body: `Hi {{clientName}},\n\nHope you're doing well! I'm just doing some bookkeeping and noticed invoice {{invoiceNumber}} for {{amount}} is a few days past due. No worries at all, I know things get busy!\n\nHere is a link to settle it whenever you get a chance: {{paymentLink}}\n\nLet me know if you have any questions.`,
+        sms: 'Hey {{clientName}}, just checking in on invoice {{invoiceNumber}} ({{amount}}). Let me know if you have questions!',
       },
       3: {
-        subject: 'Following up — Invoice {{invoiceNumber}} is now {{daysOverdue}} days overdue',
-        body: `Hi {{clientName}},\n\nI wanted to follow up on invoice {{invoiceNumber}} for {{amount}} which was due on {{dueDate}} — it's now {{daysOverdue}} days overdue. I'd really appreciate it if you could look into this when you get a chance.\n\nYou can pay quickly here: {{paymentLink}}\n\nIf there's an issue, please let me know so we can work it out together!`,
-        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is now {{daysOverdue}} days overdue. Please let me know the status.',
+        subject: 'Following up on Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nI wanted to circle back on invoice {{invoiceNumber}} for {{amount}} that was due on {{dueDate}}. It's currently {{daysOverdue}} days overdue.\n\nCould you please take a look when you get a second? Here's the payment link: {{paymentLink}}\n\nThanks!`,
+        sms: 'Hi {{clientName}}, following up on invoice {{invoiceNumber}} ({{amount}}). Could you take a look when you get a chance?',
       },
       4: {
-        subject: 'Final reminder — Invoice {{invoiceNumber}} requires your attention',
-        body: `Hi {{clientName}},\n\nThis is my final reminder about invoice {{invoiceNumber}} for {{amount}}, which is now {{daysOverdue}} days past due since {{dueDate}}. I really need to get this resolved.\n\nYou can pay quickly here: {{paymentLink}}\n\nPlease let me know how you'd like to proceed. I value our working relationship and want to sort this out.`,
-        sms: 'Final reminder: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please arrange payment. Thanks.',
+        subject: 'Invoice {{invoiceNumber}} status',
+        body: `Hi {{clientName}},\n\nI really need to get invoice {{invoiceNumber}} for {{amount}} squared away, as it's now {{daysOverdue}} days past due.\n\nCould you please let me know when this will be paid? Here is the link: {{paymentLink}}\n\nThanks.`,
+        sms: 'Hi {{clientName}}, I need to get invoice {{invoiceNumber}} ({{amount}}) squared away. Please let me know the status.',
       },
     },
     PROFESSIONAL: {
       1: {
-        subject: 'Payment Reminder — Invoice {{invoiceNumber}}',
-        body: `Hello {{clientName}},\n\nThis is a reminder that invoice {{invoiceNumber}} for {{amount}} is due today, {{dueDate}}. We would appreciate prompt payment at your earliest convenience.\n\nYou can pay quickly here: {{paymentLink}}\n\nThank you for your attention to this matter.`,
-        sms: 'Reminder: Invoice {{invoiceNumber}} ({{amount}}) is due today. Please arrange payment. Thank you.',
+        subject: 'Invoice {{invoiceNumber}} is due today',
+        body: `Hi {{clientName}},\n\nJust writing to let you know that invoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}).\n\nYou can pay it directly here: {{paymentLink}}\n\nBest,`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is due today. Thanks!',
       },
       2: {
-        subject: 'Payment Follow-Up — Invoice {{invoiceNumber}}',
-        body: `Hello {{clientName}},\n\nWe would like to bring to your attention that invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past the due date of {{dueDate}}.\n\nYou can pay quickly here: {{paymentLink}}\n\nIf payment has already been made, please disregard this notice. Otherwise, we kindly request that you arrange payment at your earliest convenience.`,
-        sms: 'Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Please arrange payment.',
+        subject: 'Following up on Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nI'm following up because invoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days past its due date of {{dueDate}}.\n\nPlease process this at your earliest convenience. Here is the link: {{paymentLink}}\n\nBest,`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days past due. Please process when able.',
       },
       3: {
-        subject: 'Urgent: Payment Overdue — Invoice {{invoiceNumber}}',
-        body: `Dear {{clientName}},\n\nThis is an important notice regarding invoice {{invoiceNumber}} for {{amount}}, which is now {{daysOverdue}} days overdue since {{dueDate}}. We kindly request immediate payment to avoid any disruption to our services.\n\nYou can pay quickly here: {{paymentLink}}\n\nIf there are any concerns regarding this payment, please contact us immediately so we can work together to resolve them.`,
-        sms: 'Urgent: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment requested.',
+        subject: 'Invoice {{invoiceNumber}} - Past Due',
+        body: `Hi {{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue (due {{dueDate}}). I need to get this resolved as soon as possible.\n\nPlease let me know if there's an issue holding this up, or you can pay here: {{paymentLink}}\n\nRegards,`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please update me on the status.',
       },
       4: {
-        subject: 'Final Notice: Payment Required — Invoice {{invoiceNumber}}',
-        body: `Dear {{clientName}},\n\nThis is our final notice regarding invoice {{invoiceNumber}} for {{amount}}, which has been outstanding for {{daysOverdue}} days since the due date of {{dueDate}}. Immediate payment is required.\n\nYou can pay quickly here: {{paymentLink}}\n\nPlease arrange payment immediately or provide confirmation if payment has already been made. Failure to respond may necessitate additional measures.`,
-        sms: 'FINAL NOTICE: Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment required.',
+        subject: 'Overdue Invoice {{invoiceNumber}} - Attention Required',
+        body: `Hi {{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} has been outstanding for {{daysOverdue}} days. I need this paid immediately.\n\nHere is the link to pay: {{paymentLink}}\n\nPlease let me know when this is handled.`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment is needed.',
       },
     },
     FIRM: {
       1: {
-        subject: 'Payment Due Today — Invoice {{invoiceNumber}}',
-        body: `{{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is due today, {{dueDate}}. Please ensure payment is processed today.\n\nPay now: {{paymentLink}}\n\nThank you.`,
-        sms: 'Invoice {{invoiceNumber}} ({{amount}}) due today. Please pay promptly.',
+        subject: 'Invoice {{invoiceNumber}} due today',
+        body: `Hi {{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is due today ({{dueDate}}). Please ensure this is processed today.\n\nPayment link: {{paymentLink}}\n\nThanks.`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is due today. Please process today.',
       },
       2: {
-        subject: 'Overdue Payment — Invoice {{invoiceNumber}} ({{daysOverdue}} Days)',
-        body: `{{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue. This payment was due on {{dueDate}} and requires your immediate attention.\n\nPay now: {{paymentLink}}\n\nPlease arrange payment today.`,
-        sms: 'Invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Immediate payment needed.',
+        subject: 'Past Due: Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is now {{daysOverdue}} days overdue. Please get this paid today.\n\nPayment link: {{paymentLink}}\n\nThanks.`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Please process today.',
       },
       3: {
-        subject: 'URGENT: Overdue Invoice {{invoiceNumber}} — {{daysOverdue}} Days Outstanding',
-        body: `{{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} has been outstanding for {{daysOverdue}} days. Despite previous reminders, payment has not been received. This matter requires your urgent attention.\n\nPay now: {{paymentLink}}\n\nPlease process this payment immediately or contact us to discuss the situation. Continued non-payment may result in suspension of services.`,
-        sms: 'URGENT: Invoice {{invoiceNumber}} ({{amount}}) {{daysOverdue}} days overdue. Pay now or contact us immediately.',
+        subject: 'URGENT: Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nInvoice {{invoiceNumber}} for {{amount}} is {{daysOverdue}} days overdue. I've sent multiple reminders and need this paid immediately.\n\nPayment link: {{paymentLink}}\n\nPlease confirm when this is paid.`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. I need this paid immediately.',
       },
       4: {
-        subject: 'FINAL NOTICE — Invoice {{invoiceNumber}} ({{daysOverdue}} Days Overdue)',
-        body: `{{clientName}},\n\nThis is our FINAL notice regarding invoice {{invoiceNumber}} for {{amount}}, now {{daysOverdue}} days past the due date of {{dueDate}}.\n\nPay now: {{paymentLink}}\n\nIf payment is not received within 48 hours, we will be forced to take further action, which may include suspension of ongoing work and formal collection proceedings. Please treat this as a matter of urgency.`,
-        sms: 'FINAL NOTICE: Invoice {{invoiceNumber}} ({{amount}}) {{daysOverdue}}d overdue. Payment required within 48hrs.',
+        subject: 'FINAL NOTICE: Invoice {{invoiceNumber}}',
+        body: `Hi {{clientName}},\n\nThis is my final notice regarding invoice {{invoiceNumber}} for {{amount}}, which is {{daysOverdue}} days late.\n\nIf this isn't paid immediately, I will have to pause all ongoing work and escalate this.\n\nPayment link: {{paymentLink}}\n\nI need this resolved today.`,
+        sms: 'Hi {{clientName}}, invoice {{invoiceNumber}} ({{amount}}) is {{daysOverdue}} days overdue. Final notice to pay immediately.',
       },
     },
   }
@@ -274,69 +336,30 @@ function getTemplateForStage(stage: number, tone: Tone): Template {
 // ─── HTML Email Builder ─────────────────────────────────
 
 function buildEmailHtml(title: string, plainBody: string, ctx: MessageContext): string {
-  const accentColors: Record<number, string> = {
-    1: '#06b6d4,#0891b2', // Cyan
-    2: '#eab308,#ca8a04', // Yellow
-    3: '#f97316,#ea580c', // Orange
-    4: '#ef4444,#dc2626', // Red
-  }
-  const accent = accentColors[Math.min(ctx.stage, 4)] || accentColors[1]
-
-  // Convert plain text to HTML paragraphs
+  // Convert plain text to simple HTML paragraphs to mimic a standard email client
   const htmlParagraphs = plainBody
     .split('\n\n')
     .filter(p => p.trim())
-    .map(p => `<p style="color:#cbd5e1;line-height:1.6;font-size:15px;margin:0 0 16px;">${escapeHtml(p.trim())}</p>`)
+    .map(p => `<p style="margin: 0 0 1em 0;">${escapeHtml(p.trim())}</p>`)
     .join('')
 
-  // Payment link button
-  const paymentButton = ctx.paymentLink
-    ? `<div style="margin:24px 0;text-align:center;">
-        <a href="${escapeHtml(ctx.paymentLink)}" style="background:linear-gradient(90deg,#06b6d4,#8b5cf6);color:#fff;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:600;display:inline-block;font-size:16px;">💳 Pay Now — $${ctx.amount.toLocaleString()}</a>
-      </div>`
+  // If the plain text body already included the payment link naturally, we might not need a button.
+  // But to be safe and ensure they see it, we can append a very simple hyperlink.
+  const paymentLinkHtml = ctx.paymentLink && !plainBody.includes(ctx.paymentLink)
+    ? `<p style="margin: 1.5em 0;"><a href="${escapeHtml(ctx.paymentLink)}" style="color: #2563eb; text-decoration: underline;">Pay Invoice ${escapeHtml(ctx.invoiceNumber || '')} ($${ctx.amount.toLocaleString()})</a></p>`
     : ''
 
-  // Invoice details card
-  const invoiceId = ctx.invoiceNumber || 'N/A'
-  const detailsCard = `
-    <div style="background:#1e293b;border-radius:12px;padding:20px;margin:20px 0;border:1px solid #334155;">
-      <table style="width:100%;border-collapse:collapse;">
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Invoice</td>
-          <td style="color:#f1f5f9;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">${escapeHtml(invoiceId)}</td>
-        </tr>
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Amount Due</td>
-          <td style="color:#22d3ee;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">$${ctx.amount.toLocaleString()}</td>
-        </tr>
-        <tr>
-          <td style="color:#94a3b8;padding:8px 0;font-size:14px;">Due Date</td>
-          <td style="color:#f1f5f9;padding:8px 0;text-align:right;font-size:14px;font-weight:600;">${escapeHtml(new Date(ctx.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))}</td>
-        </tr>
-      </table>
-    </div>`
-
+  // Standard, minimal HTML that looks like it was sent from Gmail/Outlook
   return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:'Segoe UI',Arial,sans-serif;">
-  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
-    <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%);border-radius:16px;overflow:hidden;border:1px solid #334155;">
-      <div style="background:linear-gradient(90deg,${accent});padding:24px 32px;">
-        <h1 style="color:#fff;margin:0;font-size:20px;font-weight:600;">⚡ Invoice Chaser</h1>
-      </div>
-      <div style="padding:32px;">
-        ${htmlParagraphs}
-        ${detailsCard}
-        ${paymentButton}
-      </div>
-      <div style="padding:16px 32px;border-top:1px solid #334155;">
-        <p style="color:#64748b;font-size:12px;margin:0;">This is an automated reminder from Invoice Chaser.</p>
-      </div>
-    </div>
+<body style="margin:0;padding:0;font-family:Arial,sans-serif;font-size:14px;color:#000000;line-height:1.5;">
+  <div style="max-width:600px;margin:0 auto;padding:20px;">
+    ${htmlParagraphs}
+    ${paymentLinkHtml}
   </div>
 </body>
 </html>`

@@ -11,7 +11,7 @@ export interface InvoiceCreatedEvent {
   userId: string
   clientEmail: string
   clientName: string
-  amount: number
+  amount: number | string
   dueDate: Date
   whatsappNumber?: string | null
   smsNumber?: string | null
@@ -29,7 +29,7 @@ export interface InvoicePaymentDueEvent {
   userId: string
   clientEmail: string
   clientName: string
-  amount: number
+  amount: number | string
   dueDate: Date
   whatsappNumber?: string | null
   smsNumber?: string | null
@@ -43,7 +43,7 @@ export interface InvoiceOverdueEvent {
   userId: string
   clientEmail: string
   clientName: string
-  amount: number
+  amount: number | string
   dueDate: Date
   daysOverdue: number
   /** Which reminder stage this corresponds to */
@@ -62,6 +62,19 @@ export interface InvoicePaidEvent {
   userId: string
 }
 
+export interface InvoicePredueWarningEvent {
+  invoiceId: string
+  userId: string
+  clientName: string
+  dueDate: Date
+  behaviorType: string
+}
+
+export interface InvoiceTrackingEvent {
+  invoiceId: string
+  event: string
+}
+
 /**
  * Map of event names to their payload types.
  * Used to enforce type safety on emit() and on().
@@ -71,6 +84,8 @@ export interface EventMap {
   'invoice.payment_due': InvoicePaymentDueEvent
   'invoice.overdue': InvoiceOverdueEvent
   'invoice.paid': InvoicePaidEvent
+  'invoice.predue_warning': InvoicePredueWarningEvent
+  'invoice.tracking_event': InvoiceTrackingEvent
 }
 
 export type EventName = keyof EventMap

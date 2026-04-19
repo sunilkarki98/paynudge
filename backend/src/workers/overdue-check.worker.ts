@@ -5,6 +5,7 @@ import { eventBus } from '@/modules/events/event-bus'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { scheduleRecurringCheck } from '@/modules/queues/overdue-check-queue'
+import { determineNextAction } from '@/modules/ai/next-action-engine'
 import type { OverdueCheckJobData } from '@/modules/queues/overdue-check-queue'
 
 const log = logger.child({ module: 'overdue-check-worker' })
@@ -42,6 +43,8 @@ async function processOverdueCheck(job: Job<OverdueCheckJobData>): Promise<void>
       id: true,
       status: true,
       reminderStage: true,
+      clientId: true,
+      aiMetadata: true,
     },
   })
 
@@ -56,6 +59,66 @@ async function processOverdueCheck(job: Job<OverdueCheckJobData>): Promise<void>
       daysOverdue,
     })
     return
+  }
+
+  // Determine user settings and client behavior
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { shieldMode: true } })
+  const shieldMode = user?.shieldMode || false
+
+  let behaviorType = 'UNKNOWN'
+  let engagementScore = 0
+
+  if (invoice.clientId) {
+    const client = await prisma.client.findUnique({
+      where: { id: invoice.clientId },
+      select: { behaviorType: true, engagementScore: true }
+    })
+    
+    if (client) {
+      behaviorType = client.behaviorType || 'UNKNOWN'
+      engagementScore = client.engagementScore ? Number(client.engagementScore) : 0
+    }
+  }
+
+  const decision = determineNextAction({
+    riskScore: invoice.aiMetadata?.riskScore === 'HIGH' ? 80 : 50, // rough proxy
+    riskLevel: invoice.aiMetadata?.riskScore || 'MEDIUM',
+    behaviorType: behaviorType as any,
+    engagementScore,
+    invoiceAmount: Number(amount),
+    daysOverdue,
+    stage
+  })
+
+  // Handle Pre-Due Checkpoint
+  if (daysOverdue === -3 && stage === 0) {
+    if (['HIGH_RISK_GHOST', 'AVOIDANT'].includes(behaviorType)) {
+      log.info('Emitting pre-due risk warning for high-risk client', { invoiceId, behaviorType })
+      eventBus.emit('invoice.predue_warning', {
+        invoiceId,
+        userId,
+        clientName,
+        dueDate: new Date(dueDate),
+        behaviorType,
+      })
+    } else {
+      log.info('Skipping pre-due warning for safe client', { invoiceId, behaviorType })
+    }
+    return
+  }
+
+  if (decision.action === 'WAIT') {
+    log.info('Next action engine suggested WAIT. Rescheduling.', { invoiceId, reason: decision.reason })
+    if (chaseUntilPaid) {
+      await scheduleRecurringCheck(job.data, daysOverdue + Math.ceil(chaseIntervalDays / 2)) 
+    }
+    return
+  }
+
+  let finalChannel = contactChannel
+  if (decision.action === 'SWITCH_CHANNEL') {
+    finalChannel = 'SMS'
+    log.info('Next action engine suggested channel switch to SMS', { invoiceId })
   }
 
   // Only emit overdue if we haven't already sent a reminder for this stage
@@ -85,7 +148,7 @@ async function processOverdueCheck(job: Job<OverdueCheckJobData>): Promise<void>
     dueDate: new Date(dueDate),
     daysOverdue,
     stage,
-    contactChannel: contactChannel || 'EMAIL',
+    contactChannel: finalChannel || 'EMAIL',
     whatsappNumber: whatsappNumber || null,
     smsNumber: smsNumber || null,
     paymentLinkToken,

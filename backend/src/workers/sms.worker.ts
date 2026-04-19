@@ -4,17 +4,27 @@ import { QUEUE_NAMES } from '@/modules/queues/queue-names'
 import { SMSJobData } from '@/modules/queues/sms-queue'
 import { logger } from '@/lib/logger'
 import { withIdempotencyGuard } from '@/modules/queues/job-wrapper'
+import { prisma } from '@/lib/prisma'
 
 const log = logger.child({ module: 'sms-worker' })
 
 async function processSMSJob(job: Job<SMSJobData>) {
-  const { stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
+  const { invoiceId, stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
 
   await withIdempotencyGuard('sms', job, async (invoice) => {
     const { generateMessage } = await import('@/modules/ai/message-generator')
     const { sendSMS } = await import('@/modules/communication/sms-sender')
     
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    // Fetch client and user to retrieve behavioral profile and tone overrides
+    const invoiceRecord = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { 
+        client: true,
+        user: { select: { shieldMode: true } }
+      }
+    })
+    
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
 
     const generated = await generateMessage({
@@ -25,6 +35,10 @@ async function processSMSJob(job: Job<SMSJobData>) {
       daysOverdue,
       paymentLink,
       tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+      behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
+      behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
+      overrideTone: invoiceRecord?.client?.overrideTone || undefined,
+      shieldMode: invoiceRecord?.user?.shieldMode || false,
     })
 
     const textToSend = generated.smsText || generated.plainText.substring(0, 160)
@@ -40,7 +54,10 @@ async function processSMSJob(job: Job<SMSJobData>) {
       throw new Error(result.error || 'Unknown SMS send error')
     }
 
-    return { plainText: textToSend }
+    return { 
+      plainText: textToSend,
+      persuasionStrategy: generated.persuasionStrategy
+    }
   })
 }
 

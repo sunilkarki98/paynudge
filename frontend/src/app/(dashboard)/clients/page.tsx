@@ -13,6 +13,10 @@ interface Client {
   chasingProfile: string
   contactChannel: string
   invoices: Array<{ id: string; amount: number | string; status: string }>
+  behaviorType?: string
+  averageDaysToPay?: number
+  paymentReliability?: number
+  toneSensitivity?: string
 }
 
 function formatCurrency(amount: number | string): string {
@@ -189,18 +193,29 @@ export default function ClientsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 pt-4 border-t border-surface-border">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-text-primary">{client.invoices.length}</p>
-                    <p className="text-xs text-text-muted">Invoices</p>
+                {/* Behavioral Intelligence Section */}
+                <div className="px-6 py-4 bg-surface-raised border-t border-surface-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Payment Personality</span>
+                    {client.behaviorType && client.behaviorType !== 'UNKNOWN' && (
+                      <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border shadow-sm ${
+                        ['SLOW_BUT_RELIABLE'].includes(client.behaviorType) ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        ['AVOIDANT', 'HIGH_RISK_GHOST'].includes(client.behaviorType) ? 'bg-red-50 text-red-700 border-red-200' :
+                        'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {client.behaviorType.replace(/_/g, ' ')}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-emerald-600">{formatCurrency(paidAmount)}</p>
-                    <p className="text-xs text-text-muted">Paid</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-amber-600">{unpaidCount}</p>
-                    <p className="text-xs text-text-muted">Unpaid</p>
+                  <div className="flex items-center justify-between text-xs text-text-muted mt-2">
+                    <div className="flex flex-col">
+                      <span className="font-medium text-text-primary">{client.averageDaysToPay ?? '?'} Days</span>
+                      <span>Avg Delay</span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="font-medium text-text-primary">{client.paymentReliability ? (client.paymentReliability * 100).toFixed(0) : '?'}%</span>
+                      <span>Reliability</span>
+                    </div>
                   </div>
                 </div>
               </div>

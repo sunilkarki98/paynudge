@@ -33,15 +33,24 @@ const log = logger.child({ module: 'email-worker' })
  */
 
 async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
-  const { stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
+  const { invoiceId, stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
 
   await withIdempotencyGuard('email', job, async (invoice) => {
     // Dynamic import to prevent circular deps during worker boot
     const { generateMessage } = await import('@/modules/ai/message-generator')
     const { sendEmail } = await import('@/modules/communication/email-sender')
     
+    // Fetch client and user to retrieve behavioral profile and tone overrides
+    const invoiceRecord = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: { 
+        client: true,
+        user: { select: { shieldMode: true } }
+      }
+    })
+    
     // Construct payment link and tracking URLs
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
     const trackingPixelUrl = `${baseUrl}/api/track/email?invoice=${invoice.id}&stage=${stage}&t=${Date.now()}`
 
@@ -53,6 +62,10 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
       daysOverdue,
       paymentLink,
       tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+      behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
+      behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
+      overrideTone: invoiceRecord?.client?.overrideTone || undefined,
+      shieldMode: invoiceRecord?.user?.shieldMode || false,
     })
 
     const result = await sendEmail({
@@ -68,7 +81,10 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
       throw new Error(result.error || 'Unknown email send error')
     }
 
-    return { plainText: generated.plainText }
+    return { 
+      plainText: generated.plainText,
+      persuasionStrategy: generated.persuasionStrategy 
+    }
   })
 }
 

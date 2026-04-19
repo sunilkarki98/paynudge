@@ -21,7 +21,7 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>) {
     const { generateMessage } = await import('@/modules/ai/message-generator')
     const { sendWhatsApp } = await import('@/modules/communication/whatsapp-sender')
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
 
     const generated = await generateMessage({

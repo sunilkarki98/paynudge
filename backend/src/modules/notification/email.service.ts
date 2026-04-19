@@ -210,7 +210,7 @@ export async function sendReminderEmail(
 // ─── Auth Emails ─────────────────────────────────────────
 
 export async function sendVerificationEmail(email: string, token: string): Promise<boolean> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const verifyUrl = `${baseUrl}/verify-email?token=${token}`
 
   const content = `
@@ -237,7 +237,7 @@ export async function sendVerificationEmail(email: string, token: string): Promi
 }
 
 export async function sendPasswordResetEmail(email: string, token: string): Promise<boolean> {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+  const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const resetUrl = `${baseUrl}/reset-password?token=${token}`
 
   const content = `

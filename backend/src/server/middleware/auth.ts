@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
 import { verifyToken, JWTPayload } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'auth-middleware' })
@@ -51,23 +50,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   log.info('Authenticated request', { userId: payload.userId, email: payload.email, path: req.path })
   log.info('Authenticated user', { userId: payload.userId, email: payload.email })
 
-  // Auto-create user in DB if they don't exist yet (e.g., first Google OAuth login)
-  try {
-    await prisma.user.upsert({
-      where: { id: payload.userId },
-      update: {},
-      create: {
-        id: payload.userId,
-        email: payload.email,
-      },
-    })
-  } catch (err) {
-    log.error('Failed to upsert user', {
-      userId: payload.userId,
-      error: err instanceof Error ? err.message : String(err),
-    })
-    // Still proceed — the user is authenticated, DB sync can fail gracefully
-  }
+
 
   next()
 }

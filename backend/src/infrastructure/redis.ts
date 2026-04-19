@@ -22,7 +22,7 @@ export function getRedisConnection(): Redis {
 
   redisInstance = new Redis(redisUrl, {
     maxRetriesPerRequest: null, // Required by BullMQ
-    enableReadyCheck: false,
+    enableReadyCheck: true,
     retryStrategy(times: number) {
       const delay = Math.min(times * 200, 5000)
       log.warn('Redis connection retry', { attempt: times, delayMs: delay })
@@ -58,7 +58,7 @@ export function createRedisConnection(): Redis {
 
   return new Redis(redisUrl, {
     maxRetriesPerRequest: null,
-    enableReadyCheck: false,
+    enableReadyCheck: true,
     retryStrategy(times: number) {
       const delay = Math.min(times * 200, 5000)
       return delay

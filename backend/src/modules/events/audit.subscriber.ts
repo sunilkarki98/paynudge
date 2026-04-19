@@ -6,7 +6,10 @@ import type {
   InvoicePaymentDueEvent,
   InvoiceOverdueEvent,
   InvoicePaidEvent,
+  InvoicePredueWarningEvent,
+  InvoiceTrackingEvent,
 } from './event-types'
+import { syncClientBehavior } from '../ai/client-behavior-profile'
 
 const log = logger.child({ module: 'audit-subscriber' })
 
@@ -68,6 +71,38 @@ async function onInvoicePaid(event: InvoicePaidEvent): Promise<void> {
       },
     },
   })
+
+  // Sync behavior asynchronously since this is a strong signal
+  const invoice = await prisma.invoice.findUnique({ where: { id: event.invoiceId } })
+  if (invoice?.clientId) {
+    syncClientBehavior(invoice.clientId).catch(err => 
+      log.error('Failed to sync behavior on paid event', { error: err.message })
+    )
+  }
+}
+
+async function onInvoiceTrackingEvent(event: InvoiceTrackingEvent): Promise<void> {
+  // Sync behavior asynchronously to update engagement score
+  const invoice = await prisma.invoice.findUnique({ where: { id: event.invoiceId } })
+  if (invoice?.clientId) {
+    syncClientBehavior(invoice.clientId).catch(err => 
+      log.error('Failed to sync behavior on tracking event', { error: err.message })
+    )
+  }
+}
+
+async function onInvoicePredueWarning(event: InvoicePredueWarningEvent): Promise<void> {
+  await prisma.invoiceEvent.create({
+    data: {
+      invoiceId: event.invoiceId,
+      eventType: 'predue_warning',
+      metadata: {
+        clientName: event.clientName,
+        dueDate: event.dueDate,
+        behaviorType: event.behaviorType,
+      },
+    },
+  })
 }
 
 /**
@@ -79,6 +114,8 @@ export function registerAuditSubscribers(): void {
   eventBus.on('invoice.payment_due', onInvoicePaymentDue)
   eventBus.on('invoice.overdue', onInvoiceOverdue)
   eventBus.on('invoice.paid', onInvoicePaid)
+  eventBus.on('invoice.predue_warning', onInvoicePredueWarning)
+  eventBus.on('invoice.tracking_event', onInvoiceTrackingEvent)
 
   log.info('Audit subscribers registered')
 }

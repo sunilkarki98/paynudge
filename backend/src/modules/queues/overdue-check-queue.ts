@@ -35,6 +35,36 @@ export function getOverdueCheckQueue() {
 }
 
 /**
+ * Calculate the optimal delivery time based on behavioral psychology.
+ * Avoids Friday evenings and weekends, pushing the delivery to Tuesday 10:00 AM.
+ */
+export function calculateOptimalDeliveryTime(targetDate: Date): Date {
+  const date = new Date(targetDate)
+  const day = date.getUTCDay() // 0=Sun, 1=Mon, ..., 5=Fri, 6=Sat
+  const hours = date.getUTCHours()
+
+  let shiftDays = 0
+
+  if (day === 5 && hours >= 17) {
+    // Friday after 5 PM UTC -> shift 4 days to Tuesday
+    shiftDays = 4
+  } else if (day === 6) {
+    // Saturday -> shift 3 days to Tuesday
+    shiftDays = 3
+  } else if (day === 0) {
+    // Sunday -> shift 2 days to Tuesday
+    shiftDays = 2
+  }
+
+  if (shiftDays > 0) {
+    date.setUTCDate(date.getUTCDate() + shiftDays)
+    date.setUTCHours(10, 0, 0, 0) // 10:00 AM UTC
+  }
+
+  return date
+}
+
+/**
  * Schedule overdue check jobs for an invoice.
  * Called once on invoice creation.
  * 
@@ -89,6 +119,7 @@ export async function scheduleOverdueChecks(data: {
     } else {
       // defaults to NORMAL
       checkpoints = [
+        { daysOverdue: -3, stage: 0 }, // Pre-Due Risk Alert
         { daysOverdue: 3, stage: 2 },
         { daysOverdue: 7, stage: 3 },
         { daysOverdue: 14, stage: 4 },
@@ -96,9 +127,18 @@ export async function scheduleOverdueChecks(data: {
     }
   }
 
+  // Ensure all custom profiles get the Pre-Due check if missing
+  if (!checkpoints.some((c) => c.daysOverdue === -3)) {
+    checkpoints.unshift({ daysOverdue: -3, stage: 0 })
+  }
+
   for (const checkpoint of checkpoints) {
     const jobId = `overdue:${data.invoiceId}:day:${checkpoint.daysOverdue}`
-    const targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1000)
+    let targetTime = new Date(data.dueDate.getTime() + checkpoint.daysOverdue * 24 * 60 * 60 * 1000)
+    
+    // Apply Smart Scheduling
+    targetTime = calculateOptimalDeliveryTime(targetTime)
+    
     const delayMs = Math.max(0, targetTime.getTime() - Date.now())
 
     try {
@@ -160,9 +200,12 @@ export async function scheduleRecurringCheck(data: OverdueCheckJobData, newDaysO
   const queue = getOverdueCheckQueue()
   
   const jobId = `overdue:${data.invoiceId}:day:${newDaysOverdue}:recurring`
-  // We calculate delay from current time + interval days (rather than purely from due date just to be safe, 
-  // or we can stick to absolute due date math. Let's do absolute to prevent drift)
-  const targetTime = new Date(new Date(data.dueDate).getTime() + newDaysOverdue * 24 * 60 * 60 * 1000)
+  // We calculate delay from current time + interval days
+  let targetTime = new Date(new Date(data.dueDate).getTime() + newDaysOverdue * 24 * 60 * 60 * 1000)
+  
+  // Apply Smart Scheduling
+  targetTime = calculateOptimalDeliveryTime(targetTime)
+  
   const delayMs = Math.max(0, targetTime.getTime() - Date.now())
 
   try {
@@ -198,7 +241,7 @@ export async function cancelPendingOverdueChecks(invoiceId: string): Promise<num
   let cancelled = 0
 
   // Cancel across all possible checkpoint configurations
-  for (const day of [1, 3, 5, 7, 14, 30]) {
+  for (const day of [-3, 1, 3, 5, 7, 14, 30]) {
     const jobId = `overdue:${invoiceId}:day:${day}`
     try {
       const job = await queue.getJob(jobId)
