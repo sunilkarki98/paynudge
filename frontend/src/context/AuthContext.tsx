@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/api'
 
 interface User {
   id: string
@@ -30,17 +31,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let initialSessionHandled = false
 
     // Fetch subscription details from backend
-    const fetchSubscription = async (token: string, baseUser: any) => {
+    const fetchSubscription = async (baseUser: any) => {
       try {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/billing/subscription`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          setUser({ ...baseUser, subscriptionTier: data.tier })
-        } else {
-          setUser(baseUser)
-        }
+        const data = await api.get<{ tier: 'FREE' | 'PRO' }>('/billing/subscription')
+        setUser({ ...baseUser, subscriptionTier: data.tier })
       } catch (err) {
         setUser(baseUser)
       }
@@ -55,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
           emailVerified: !!session.user.email_confirmed_at,
         }
-        await fetchSubscription(session.access_token, baseUser)
+        await fetchSubscription(baseUser)
       }
       initialSessionHandled = true
       setIsLoading(false)
@@ -73,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
           emailVerified: !!session.user.email_confirmed_at,
         }
-        fetchSubscription(session.access_token, baseUser)
+        fetchSubscription(baseUser)
       } else {
         setUser(null)
       }
@@ -84,23 +78,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    // #region agent log
-    if (error) {
-      fetch('http://127.0.0.1:7359/ingest/3b0c2916-fdb5-45b8-9836-ac0638fd59ae', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '964b3b' },
-        body: JSON.stringify({
-          sessionId: '964b3b',
-          runId: 'auth-client',
-          hypothesisId: 'H-client-password',
-          location: 'frontend/src/context/AuthContext.tsx:login',
-          message: 'signInWithPassword error',
-          data: { code: error.code, message: error.message },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
     if (error) throw new Error(error.message)
   }, [])
 
@@ -114,23 +91,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     })
-    // #region agent log
-    if (error) {
-      fetch('http://127.0.0.1:7359/ingest/3b0c2916-fdb5-45b8-9836-ac0638fd59ae', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '964b3b' },
-        body: JSON.stringify({
-          sessionId: '964b3b',
-          runId: 'auth-client',
-          hypothesisId: 'H-client-signup',
-          location: 'frontend/src/context/AuthContext.tsx:register',
-          message: 'signUp error',
-          data: { code: error.code, message: error.message },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
     if (error) throw new Error(error.message)
   }, [])
 
@@ -141,23 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         redirectTo: `${window.location.origin}/`,
       }
     })
-    // #region agent log
-    if (error) {
-      fetch('http://127.0.0.1:7359/ingest/3b0c2916-fdb5-45b8-9836-ac0638fd59ae', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '964b3b' },
-        body: JSON.stringify({
-          sessionId: '964b3b',
-          runId: 'auth-client',
-          hypothesisId: 'H-client-oauth-start',
-          location: 'frontend/src/context/AuthContext.tsx:signInWithGoogle',
-          message: 'signInWithOAuth error (before redirect)',
-          data: { code: error.code, message: error.message },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    }
-    // #endregion
     if (error) throw new Error(error.message)
   }, [])
 

@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
-import Link from 'next/link'
+import { api } from '@/lib/api'
 
 function VerifyEmailContent() {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
@@ -21,26 +20,15 @@ function VerifyEmailContent() {
 
     const verifyToken = async () => {
       try {
-        const res = await fetch('/api/auth/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ token }),
-        })
-
-        const data = await res.json()
-
-        if (res.ok) {
-          setStatus('success')
-          setMessage(data.message || 'Email verified successfully! You can now access all features.')
-          // Optionally redirect after a few seconds
-          setTimeout(() => router.push('/dashboard'), 3000)
-        } else {
-          setStatus('error')
-          setMessage(data.error || 'Verification failed. The link may be expired.')
-        }
-      } catch (err) {
+        const data = await api.post<{ message: string }>('/auth/verify', { token })
+        
+        setStatus('success')
+        setMessage(data.message || 'Email verified successfully! You can now access all features.')
+        // Optionally redirect after a few seconds
+        setTimeout(() => router.push('/dashboard'), 3000)
+      } catch (err: any) {
         setStatus('error')
-        setMessage('A network error occurred. Please try again.')
+        setMessage(err.message || 'Verification failed. The link may be expired.')
       }
     }
 

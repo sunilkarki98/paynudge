@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, Suspense } from 'react'
+import { api } from '@/lib/api'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useState } from 'react'
+import { Suspense } from 'react'
 
 function ResetPasswordContent() {
   const [password, setPassword] = useState('')
@@ -10,14 +12,14 @@ function ResetPasswordContent() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  
+
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!token) {
       setError('Missing or invalid reset token.')
       return
@@ -30,24 +32,13 @@ function ResetPasswordContent() {
 
     setIsLoading(true)
     setError('')
-    
+
     try {
-      const res = await fetch('/api/auth/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Password reset failed')
-      }
-
+      await api.post('/auth/reset-password', { token, password })
       setSuccess(true)
       setTimeout(() => router.push('/login'), 3000)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+    } catch (err: any) {
+      setError(err.message || 'An error occurred')
     } finally {
       setIsLoading(false)
     }
@@ -70,7 +61,7 @@ function ResetPasswordContent() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="bg-surface-raised py-8 px-4 shadow-2xl sm:rounded-2xl border border-surface-border sm:px-10">
-          
+
           {success ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">

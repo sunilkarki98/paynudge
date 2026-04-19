@@ -1,5 +1,6 @@
 'use client'
 
+import { api } from '@/lib/api'
 import { useState } from 'react'
 import Link from 'next/link'
 
@@ -13,23 +14,12 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setIsLoading(true)
     setError('')
-    
+
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-
-      const data = await res.json()
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Request failed')
-      }
-
+      await api.post('/auth/forgot-password', { email })
       setSuccess(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred')
+    } catch (err: any) {
+      setError(err.message || 'An error occurred')
     } finally {
       setIsLoading(false)
     }
@@ -44,7 +34,7 @@ export default function ForgotPasswordPage() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center">
         <div className="mx-auto w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center shadow-lg shadow-primary-500/20 mb-6">
           <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
           </svg>
         </div>
         <h2 className="text-3xl font-extrabold text-text-primary tracking-tight">
@@ -57,7 +47,7 @@ export default function ForgotPasswordPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
         <div className="bg-surface-raised py-8 px-4 shadow-2xl sm:rounded-2xl border border-surface-border sm:px-10">
-          
+
           {success ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">

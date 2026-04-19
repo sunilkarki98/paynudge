@@ -1,20 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-
-interface ModelMeta {
-  id: string
-  displayName: string
-  description: string
-}
-
-interface UserData {
-  id: string
-  email: string
-  name: string | null
-  subscriptionTier: 'FREE' | 'PRO'
-  createdAt: string
-}
+import { api } from '@/lib/api'
 
 export default function AdminSettingsPage() {
   const [adminKey, setAdminKey] = useState('')
@@ -39,18 +25,14 @@ export default function AdminSettingsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
   // Standard fetch wrapper with admin key
-  const fetchWithKey = async (url: string, options: RequestInit = {}) => {
-    const res = await fetch(url, {
+  const callAdmin = async (path: string, options: any = {}) => {
+    return await api.request(path, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
         'x-admin-key': adminKey,
         ...options.headers,
       }
     })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok) throw new Error(data.error || 'Request failed')
-    return data
   }
 
   const handleUnlock = async (e: React.FormEvent) => {
@@ -60,13 +42,17 @@ export default function AdminSettingsPage() {
     
     try {
       // 1. Fetch AI settings
-      const result = await fetchWithKey('/api/admin/settings')
+      const result = await api.get<any>('/admin/settings', {
+        headers: { 'x-admin-key': adminKey }
+      })
       setApiKey(result.apiKey || '')
       setParserModel(result.parserModel || '')
       setGeneratorModel(result.generatorModel || '')
       
       // 2. Fetch Users
-      const userResult = await fetchWithKey('/api/admin/users')
+      const userResult = await api.get<any>('/admin/users', {
+        headers: { 'x-admin-key': adminKey }
+      })
       if (userResult.success) {
         setUsers(userResult.users)
       }
@@ -89,12 +75,9 @@ export default function AdminSettingsPage() {
     setIsDetecting(true)
     setMessage(null)
     try {
-      const res = await fetch('/api/admin/settings/models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': activeAdminKey },
-        body: JSON.stringify({ apiKey: keyToUse })
+      const result = await api.post<any>('/admin/settings/models', { apiKey: keyToUse }, {
+        headers: { 'x-admin-key': activeAdminKey }
       })
-      const result = await res.json()
       
       if (result.success) {
         setAvailableModels(result.models || [])
@@ -118,9 +101,8 @@ export default function AdminSettingsPage() {
     setMessage(null)
 
     try {
-      await fetchWithKey('/api/admin/settings', {
-        method: 'POST',
-        body: JSON.stringify({ apiKey, parserModel, generatorModel })
+      await api.post('/admin/settings', { apiKey, parserModel, generatorModel }, {
+        headers: { 'x-admin-key': adminKey }
       })
       setMessage({ type: 'success', text: 'System AI Settings saved successfully. Changes are live instantly.' })
     } catch (err) {

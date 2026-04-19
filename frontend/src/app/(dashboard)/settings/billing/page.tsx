@@ -1,9 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useAuth } from '@/context/AuthContext'
-import { supabase } from '@/lib/supabase'
-import { CreditCard, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react'
+import { api } from '@/lib/api'
 
 export default function BillingSettingsPage() {
   const { user } = useAuth()
@@ -17,22 +14,14 @@ export default function BillingSettingsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const token = (await supabase.auth.getSession())?.data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/billing/checkout`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to create checkout')
+      const data = await api.get<{ checkoutUrl: string }>('/billing/checkout')
       
       // Redirect to Lemon Squeezy checkout URL
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
     } finally {
       setIsLoading(false)
     }
@@ -42,21 +31,13 @@ export default function BillingSettingsPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const token = (await supabase.auth.getSession())?.data.session?.access_token
-      if (!token) throw new Error('Not authenticated')
-
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/billing/portal`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to get billing portal')
+      const data = await api.get<{ portalUrl: string }>('/billing/portal')
       
       if (data.portalUrl) {
         window.location.href = data.portalUrl
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
     } finally {
       setIsLoading(false)
     }

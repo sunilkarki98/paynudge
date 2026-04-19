@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { api } from '@/lib/api'
 
 interface PaymentPageClientProps {
   invoice: {
@@ -30,16 +30,10 @@ export default function PaymentPageClient({ invoice, token }: PaymentPageClientP
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/pay/${token}/notify`, {
-        method: 'POST',
-      })
-      
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to notify')
-      
+      await api.post(`/pay/${token}/notify`)
       setSuccess(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong')
+    } catch (err: any) {
+      setError(err.message || 'Something went wrong')
     } finally {
       setLoading(false)
     }
