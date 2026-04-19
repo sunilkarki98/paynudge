@@ -28,7 +28,7 @@ import { logger } from '@/lib/logger'
 const log = logger.child({ module: 'server' })
 
 const app = express()
-const PORT = parseInt(process.env.API_PORT || '4000', 10)
+const PORT = parseInt(process.env.PORT || process.env.API_PORT || '4000', 10)
 
 // ─── Global Middleware ───────────────────────────────────
 
@@ -40,7 +40,11 @@ app.use(helmet({
 
 // CORS — allow the Next.js frontend origin
 app.use(cors({
-  origin: process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  origin: [
+    process.env.FRONTEND_URL || '',
+    process.env.NEXT_PUBLIC_APP_URL || '',
+    'http://localhost:3000'
+  ].filter(Boolean),
   credentials: true,
 }))
 
@@ -67,7 +71,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const duration = Date.now() - start
     // Skip noisy health checks in logs
-    if (req.path !== '/api/health') {
+    if (req.path !== '/api/health' && req.path !== '/') {
       log.info(`${req.method} ${req.path}`, {
         status: res.statusCode,
         duration: `${duration}ms`,
@@ -78,6 +82,11 @@ app.use((req, res, next) => {
 })
 
 // ─── API Routes ──────────────────────────────────────────
+
+// Root health check to prevent 404s on the main Railway URL
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'PayNudge API is running', version: '1.0.0' })
+})
 
 app.use('/api', apiRouter)
 
@@ -90,7 +99,7 @@ app.use(errorHandler)
 // Register event handlers (shared with workers)
 registerAllEventHandlers()
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   log.info(`Express API server running on port ${PORT}`, {
     port: PORT,
     env: process.env.NODE_ENV || 'development',
