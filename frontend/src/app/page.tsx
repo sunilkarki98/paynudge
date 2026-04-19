@@ -129,9 +129,12 @@ export default function LandingPage() {
             <p className="text-lg lg:text-xl text-text-primary max-w-2xl mx-auto leading-relaxed font-medium">
               Stop manually chasing clients. Our AI analyzes payment behavior and deploys perfectly-toned reminders via your own Gmail and SMS until you get paid—protecting your client relationships while securing your cashflow.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link href="/register" className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-bold text-lg hover:shadow-2xl hover:shadow-primary-500/30 hover:-translate-y-1 transition-all flex items-center justify-center gap-2">
-                Start Free Trial <ArrowRight className="w-5 h-5" />
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up">
+              <Link
+                href="/register"
+                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-accent-500 text-white font-bold text-lg hover:shadow-2xl hover:shadow-primary-500/30 transition-all hover:-translate-y-1 w-full sm:w-auto text-center"
+              >
+                Start Free Trial
               </Link>
               <a href="#how-it-works" className="w-full sm:w-auto px-8 py-4 rounded-2xl glass-card font-medium text-text-primary hover:bg-surface-raised transition-all">
                 See how it works ↓
@@ -280,6 +283,7 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        {/* FAQ Section */}
               {/* Free Trial */}
               <div className="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform">
                 <div className="mb-6">
@@ -313,11 +317,11 @@ export default function LandingPage() {
                   <p className="text-text-secondary text-sm mt-1">For serious freelancers & agencies</p>
                 </div>
                 <div className="mb-8">
-                  <span className="text-4xl font-bold text-text-primary">$12</span>
+                  <span className="text-4xl font-bold text-text-primary">$19</span>
                   <span className="text-text-muted text-sm ml-1">/month</span>
                 </div>
                 <ul className="space-y-3 mb-8">
-                  {['Unlimited invoices', 'Everything in Free Trial', 'SMS via Twilio', 'Chase-until-paid automation', 'Custom nudge intervals', 'Priority support'].map((feature) => (
+                  {['Unlimited invoices', 'Full Behavioral Intelligence', 'Connect your Twilio (SMS/WA)', 'Chase-until-paid automation', 'Custom reminder intervals', 'Priority support'].map((feature) => (
                     <li key={feature} className="flex items-center gap-3 text-sm text-text-secondary font-medium">
                       <CheckCircle className="w-4 h-4 text-primary-500 flex-shrink-0" />
                       {feature}
