@@ -66,6 +66,7 @@ async function request<T>(path: string, options: ApiRequestOptions = {}): Promis
 }
 
 export const api = {
+  request,
   get: <T>(path: string, options?: ApiRequestOptions) => 
     request<T>(path, { ...options, method: 'GET' }),
     

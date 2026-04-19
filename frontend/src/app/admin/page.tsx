@@ -39,7 +39,9 @@ export default function AdminSettingsPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
 
-  // Standard fetch wrapper with admin key
+  /**
+   * Wrapper for admin-only requests that require the x-admin-key header
+   */
   const callAdmin = async (path: string, options: any = {}) => {
     return await api.request(path, {
       ...options,
@@ -57,17 +59,13 @@ export default function AdminSettingsPage() {
     
     try {
       // 1. Fetch AI settings
-      const result = await api.get<any>('/admin/settings', {
-        headers: { 'x-admin-key': adminKey }
-      })
+      const result = await callAdmin('/admin/settings') as any
       setApiKey(result.apiKey || '')
       setParserModel(result.parserModel || '')
       setGeneratorModel(result.generatorModel || '')
       
       // 2. Fetch Users
-      const userResult = await api.get<any>('/admin/users', {
-        headers: { 'x-admin-key': adminKey }
-      })
+      const userResult = await callAdmin('/admin/users') as any
       if (userResult.success) {
         setUsers(userResult.users)
       }
@@ -83,8 +81,6 @@ export default function AdminSettingsPage() {
       setIsLoading(false)
     }
   }
-
-  // ─── AI Config Methods ─────────────────────────────────
 
   const detectModels = async (keyToUse: string, activeAdminKey: string) => {
     setIsDetecting(true)
@@ -116,9 +112,10 @@ export default function AdminSettingsPage() {
     setMessage(null)
 
     try {
-      await api.post('/admin/settings', { apiKey, parserModel, generatorModel }, {
-        headers: { 'x-admin-key': adminKey }
-      })
+      await callAdmin('/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify({ apiKey, parserModel, generatorModel })
+      }) as any
       setMessage({ type: 'success', text: 'System AI Settings saved successfully. Changes are live instantly.' })
     } catch (err) {
        setMessage({ type: 'error', text: 'Failed to save settings.' })
@@ -129,8 +126,9 @@ export default function AdminSettingsPage() {
 
   const handleTierChange = async (userId: string, newTier: 'FREE' | 'PRO') => {
     try {
-      await api.post(`/admin/users/${userId}/tier`, { tier: newTier }, {
-        headers: { 'x-admin-key': adminKey }
+      await callAdmin(`/admin/users/${userId}/tier`, {
+        method: 'POST',
+        body: JSON.stringify({ tier: newTier })
       })
       
       // Optimistically update UI
