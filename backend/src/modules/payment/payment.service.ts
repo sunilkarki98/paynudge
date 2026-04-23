@@ -67,6 +67,7 @@ export async function getPaymentLinkAndTrackView(token: string) {
 
 /**
  * Marks that a client has notified the freelancer about a payment.
+ * Transitions the invoice to UNVERIFIED_PAYMENT (pauses reminders via Outbox).
  */
 export async function processPaymentNotification(token: string) {
   const paymentLink = await prisma.paymentLink.findUnique({
@@ -90,15 +91,42 @@ export async function processPaymentNotification(token: string) {
     throw new Error('Invoice is already paid')
   }
 
-  // Log the notification event
-  await prisma.invoiceEvent.create({
-    data: {
-      invoiceId: invoice.id,
-      eventType: 'client_notified_paid',
-    },
+  // Use a transaction to atomically:
+  // 1. Transition invoice to UNVERIFIED_PAYMENT (pauses reminders)
+  // 2. Log the event
+  // 3. Write an Outbox event to cancel all pending jobs
+  await prisma.$transaction(async (tx) => {
+    // Only transition if not already in a terminal/paused state
+    const terminalStates = ['PAID', 'VOIDED', 'WRITTEN_OFF', 'LEGAL_HOLD', 'UNVERIFIED_PAYMENT']
+    if (!terminalStates.includes(invoice.state)) {
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          state: 'UNVERIFIED_PAYMENT',
+          lastStateChangeAt: new Date(),
+          stateMetadata: { reason: 'Client indicated payment via payment link' },
+        },
+      })
+    }
+
+    await tx.invoiceEvent.create({
+      data: {
+        invoiceId: invoice.id,
+        eventType: 'client_notified_paid',
+        metadata: { token },
+      },
+    })
+
+    // Emit via Outbox to cancel all pending reminder jobs
+    await tx.outboxEvent.create({
+      data: {
+        eventType: 'invoice.unverified_payment',
+        payload: { invoiceId: invoice.id, userId: invoice.userId },
+      },
+    })
   })
 
-  // Send email to the freelancer
+  // Send email to the freelancer (outside transaction — non-critical)
   const freelancerEmail = invoice.user.email
   const subject = `🎉 Client payment notification for Invoice ${invoice.invoiceNumber || 'N/A'}`
   const htmlBody = `
@@ -106,7 +134,7 @@ export async function processPaymentNotification(token: string) {
       <h2>Payment Notification</h2>
       <p><strong>${invoice.clientName}</strong> has just indicated they've paid invoice <strong>${invoice.invoiceNumber || 'N/A'}</strong> for <strong>$${invoice.amount.toNumber().toLocaleString()}</strong>.</p>
       <p>Please check your accounts to confirm receipt.</p>
-      <p>If you've received the funds, log into Invoice Chaser and mark the invoice as PAID to stop automated reminders.</p>
+      <p>Automated reminders have been <strong>paused</strong>. If you've received the funds, log into PayNudge and mark the invoice as PAID.</p>
     </div>
   `
 
@@ -115,10 +143,10 @@ export async function processPaymentNotification(token: string) {
     to: freelancerEmail,
     subject,
     htmlBody,
-    plainText: `${invoice.clientName} indicated they paid invoice ${invoice.invoiceNumber}. Please verify and mark as paid in the dashboard.`,
+    plainText: `${invoice.clientName} indicated they paid invoice ${invoice.invoiceNumber}. Reminders paused. Please verify and mark as paid in the dashboard.`,
   })
 
-  log.info('Client notified paid', { invoiceId: invoice.id, token })
+  log.info('Client notified paid — invoice transitioned to UNVERIFIED_PAYMENT', { invoiceId: invoice.id, token })
 
   return { success: true, invoiceId: invoice.id }
 }

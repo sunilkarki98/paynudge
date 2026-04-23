@@ -1,0 +1,242 @@
+
+> freelancerinvoicechaser-frontend@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.4 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.79:3000
+- Environments: .env
+✓ Ready in 671ms
+⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /home/cosmic-soul/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /home/cosmic-soul/Desktop/paynudge/frontend/package-lock.json
+
+
+○ Compiling / ...
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}
+Error: Can't resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'
+    [2m[at finishWithoutResolve (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:587:18)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:679:14][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:27:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/DescriptionFilePlugin.js:89:43][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m
+    [2m[at eval (eval at create (/home/cosmic-soul/Desktop/paynudge/frontend/node_modules/tapable/lib/HookCodeFactory.js:31:10), <anonymous>:15:1)][0m
+    [2m[at /home/cosmic-soul/Desktop/paynudge/frontend/node_modules/enhanced-resolve/lib/Resolver.js:740:5][0m {
+  details: "resolve 'tailwindcss' in '/home/cosmic-soul/Desktop/paynudge'\n" +
+    '  Parsed request is a module\n' +
+    '  using description file: /home/cosmic-soul/package.json (relative path: ./Desktop/paynudge)\n' +
+    '    resolve as module\n' +
+    "      /home/cosmic-soul/Desktop/paynudge/node_modules doesn't exist or is not a directory\n" +
+    "      /home/cosmic-soul/Desktop/node_modules doesn't exist or is not a directory\n" +
+    '      looking for modules in /home/cosmic-soul/node_modules\n' +
+    '        single file module\n' +
+    '          using description file: /home/cosmic-soul/package.json (relative path: ./node_modules/tailwindcss)\n' +
+    '            no extension\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    '            .css\n' +
+    "              /home/cosmic-soul/node_modules/tailwindcss.css doesn't exist\n" +
+    "        /home/cosmic-soul/node_modules/tailwindcss doesn't exist\n" +
+    "      /home/node_modules doesn't exist or is not a directory\n" +
+    "      /node_modules doesn't exist or is not a directory"
+}

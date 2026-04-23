@@ -9,38 +9,46 @@ let isRunning = false
 let pollInterval: NodeJS.Timeout
 
 /**
- * Polls the OutboxEvent table for unprocessed events.
- * Uses atomic updates to claim events to prevent duplicate processing
- * if multiple worker instances are running.
+ * Atomically claims and processes outbox events using FOR UPDATE SKIP LOCKED.
+ * 
+ * This eliminates the TOCTOU race condition where two workers could both
+ * fetch the same events before either marks them as processed.
+ * 
+ * Processed events are retained with a processedAt timestamp for audit.
+ * A separate cleanup job should delete events older than 7 days.
  */
 async function processOutbox() {
   if (isRunning) return
   isRunning = true
 
   try {
-    // 1. Fetch up to 50 unprocessed events
-    const events = await prisma.outboxEvent.findMany({
-      where: { processed: false },
-      take: 50,
-      orderBy: { createdAt: 'asc' },
-    })
+    // Atomic claim: SELECT + UPDATE in one transaction using FOR UPDATE SKIP LOCKED.
+    // SKIP LOCKED ensures concurrent workers never contend on the same rows.
+    const claimedEvents = await prisma.$queryRaw<
+      { id: string; eventType: string; payload: any }[]
+    >`
+      UPDATE "OutboxEvent"
+      SET processed = true, "processedAt" = NOW()
+      WHERE id IN (
+        SELECT id FROM "OutboxEvent"
+        WHERE processed = false
+        ORDER BY "createdAt" ASC
+        LIMIT 50
+        FOR UPDATE SKIP LOCKED
+      )
+      RETURNING id, "eventType", payload
+    `
 
-    if (events.length === 0) {
-      isRunning = false
-      return 0 // 0 means no events processed
+    if (!claimedEvents || claimedEvents.length === 0) {
+      return 0
     }
 
-    // 2. Claim them atomically (prevent other workers from taking them)
-    const eventIds = events.map((e) => e.id)
-    await prisma.outboxEvent.updateMany({
-      where: { id: { in: eventIds }, processed: false },
-      data: { processed: true },
-    })
-
-    // 3. Emit them via the local event bus (which pushes to BullMQ)
-    for (const event of events) {
+    // Emit each claimed event via the local event bus
+    let emitted = 0
+    for (const event of claimedEvents) {
       try {
         eventBus.emit(event.eventType as EventName, event.payload as any)
+        emitted++
       } catch (err) {
         log.error('Failed to emit outbox event', {
           eventId: event.id,
@@ -50,12 +58,8 @@ async function processOutbox() {
       }
     }
 
-    // Optional: Delete processed events to keep table small
-    await prisma.outboxEvent.deleteMany({
-      where: { id: { in: eventIds } }
-    })
-    
-    return events.length
+    log.info('Outbox batch processed', { claimed: claimedEvents.length, emitted })
+    return claimedEvents.length
 
   } catch (error) {
     log.error('Error in outbox poller', {
@@ -76,7 +80,7 @@ export function startOutboxWorker(baseIntervalMs = 2000, maxIntervalMs = 15000) 
   const pollLoop = async () => {
     if (isClosed) return
 
-    const processedCount = await processOutbox()
+    const processedCount = (await processOutbox()) ?? 0
 
     if (processedCount > 0) {
       // If we found work, drop back to the fastest interval to clear the backlog

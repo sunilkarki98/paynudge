@@ -1,4 +1,5 @@
 import Twilio from 'twilio'
+import { getSetting } from '@/lib/settings'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
 import { encrypt } from '@/lib/encryption'
@@ -57,7 +58,10 @@ export async function sendSMS(options: SMSSendOptions): Promise<SMSSendResult> {
   }
 
   // Mode B: Use system Twilio
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  const sysSid = await getSetting('TWILIO_ACCOUNT_SID', process.env.TWILIO_ACCOUNT_SID)
+  const sysToken = await getSetting('TWILIO_AUTH_TOKEN', process.env.TWILIO_AUTH_TOKEN)
+
+  if (sysSid && sysToken) {
     try {
       const result = await sendWithSystemTwilio(to, message)
       return result
@@ -105,14 +109,15 @@ async function sendWithSystemTwilio(
   to: string,
   message: string
 ): Promise<SMSSendResult> {
-  const client = Twilio(
-    process.env.TWILIO_ACCOUNT_SID!,
-    process.env.TWILIO_AUTH_TOKEN!
-  )
+  const accountSid = await getSetting('TWILIO_ACCOUNT_SID', process.env.TWILIO_ACCOUNT_SID)
+  const authToken = await getSetting('TWILIO_AUTH_TOKEN', process.env.TWILIO_AUTH_TOKEN)
+  const fromNumber = await getSetting('TWILIO_PHONE_NUMBER', process.env.TWILIO_PHONE_NUMBER)
+
+  const client = Twilio(accountSid!, authToken!)
 
   const result = await client.messages.create({
     body: `[Invoice Chaser] ${message}`, // Prefix to identify system messages
-    from: process.env.TWILIO_PHONE_NUMBER!,
+    from: fromNumber!,
     to,
   })
 
@@ -193,8 +198,12 @@ export async function isTwilioConnected(userId: string): Promise<{
   }
 
   // Check if system Twilio is available
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-    return { connected: true, mode: 'system', phoneNumber: process.env.TWILIO_PHONE_NUMBER }
+  const sysSid = await getSetting('TWILIO_ACCOUNT_SID', process.env.TWILIO_ACCOUNT_SID)
+  const sysToken = await getSetting('TWILIO_AUTH_TOKEN', process.env.TWILIO_AUTH_TOKEN)
+  const sysPhone = await getSetting('TWILIO_PHONE_NUMBER', process.env.TWILIO_PHONE_NUMBER)
+
+  if (sysSid && sysToken) {
+    return { connected: true, mode: 'system', phoneNumber: sysPhone }
   }
 
   return { connected: false, mode: 'none' }

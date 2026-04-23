@@ -45,9 +45,24 @@ export async function getPreferences(req: Request, res: Response): Promise<void>
 
 // ─── PUT /api/settings/preferences ───────────────────────
 
+import { z } from 'zod'
+
+const updatePreferencesSchema = z.object({
+  customIntervals: z.any().optional(),
+  chaseIntervalDays: z.number().int().min(1).max(30).optional(),
+  chaseUntilPaid: z.boolean().optional(),
+  shieldMode: z.boolean().optional()
+})
+
 export async function updatePreferences(req: Request, res: Response): Promise<void> {
   try {
-    const { customIntervals, chaseIntervalDays, chaseUntilPaid, shieldMode } = req.body
+    const parsed = updatePreferencesSchema.safeParse(req.body)
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Invalid input', details: parsed.error.issues })
+      return
+    }
+
+    const { customIntervals, chaseIntervalDays, chaseUntilPaid, shieldMode } = parsed.data
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
       data: { customIntervals, chaseIntervalDays, chaseUntilPaid, shieldMode },
@@ -67,7 +82,7 @@ export async function updatePreferences(req: Request, res: Response): Promise<vo
 
 export async function getEmailAuthUrl(req: Request, res: Response): Promise<void> {
   try {
-    const url = getAuthorizationUrl(req.user!.userId)
+    const url = await getAuthorizationUrl(req.user!.userId)
     res.json({ url })
   } catch (error) {
     log.error('Failed to generate auth url', {
@@ -82,14 +97,14 @@ export async function getEmailAuthUrl(req: Request, res: Response): Promise<void
 
 export async function connectEmail(req: Request, res: Response): Promise<void> {
   try {
-    const { code } = req.body
+    const { code, state } = req.body
 
-    if (!code) {
-      res.status(400).json({ error: 'Authorization code is required' })
+    if (!code || !state) {
+      res.status(400).json({ error: 'Authorization code and state parameter are required' })
       return
     }
 
-    const { email } = await handleOAuthCallback(code, req.user!.userId)
+    const { email } = await handleOAuthCallback(code, state)
 
     res.json({
       success: true,
@@ -101,7 +116,7 @@ export async function connectEmail(req: Request, res: Response): Promise<void> {
       userId: req.user!.userId,
       error: error instanceof Error ? error.message : String(error),
     })
-    res.status(500).json({ error: 'Failed to connect email account' })
+    res.status(400).json({ error: 'Failed to connect email account. State may be forged or expired.' })
   }
 }
 
@@ -175,15 +190,15 @@ export async function googleOAuthCallback(req: Request, res: Response): Promise<
 
   try {
     const code = req.query.code as string
-    const userId = req.query.state as string
+    const state = req.query.state as string
 
-    if (!code || !userId) {
+    if (!code || !state) {
       res.redirect(`${frontendUrl}/settings?error=missing_params`)
       return
     }
 
-    const { email } = await handleOAuthCallback(code, userId)
-    log.info('Google OAuth callback successful', { userId, email })
+    const { email } = await handleOAuthCallback(code, state)
+    log.info('Google OAuth callback successful', { state, email })
 
     res.redirect(`${frontendUrl}/settings?google_connected=true&email=${encodeURIComponent(email)}`)
   } catch (error) {

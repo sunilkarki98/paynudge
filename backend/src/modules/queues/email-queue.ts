@@ -16,9 +16,10 @@ export interface EmailJobData {
   dueDate: string // ISO string for JSON serialization
   stage: number   // 1=due, 2=3day, 3=7day, 4=14day
   idempotencyKey: string
-  daysOverdue?: number
+  daysOverdue: number
   paymentLinkToken?: string
-  reminderTone: string
+  reminderTone?: string
+  customMessage?: string
 }
 
 /**

@@ -13,9 +13,10 @@ export interface SMSJobData {
   dueDate: string // ISO string
   stage: number
   idempotencyKey: string
-  daysOverdue?: number
+  daysOverdue: number
   paymentLinkToken?: string
-  reminderTone: string
+  reminderTone?: string
+  customMessage?: string
 }
 
 export function getSMSQueue() {

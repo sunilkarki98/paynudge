@@ -3,11 +3,15 @@
  * Outputs JSON in production, human-readable in development.
  */
 
+import { AsyncLocalStorage } from 'async_hooks'
+
 type LogLevel = 'debug' | 'info' | 'warn' | 'error'
 
 interface LogContext {
   [key: string]: unknown
 }
+
+export const loggerAsyncStorage = new AsyncLocalStorage<LogContext>()
 
 const LOG_LEVELS: Record<LogLevel, number> = {
   debug: 0,
@@ -20,19 +24,22 @@ const MIN_LEVEL = LOG_LEVELS[(process.env.LOG_LEVEL as LogLevel) || 'info']
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 function formatMessage(level: LogLevel, message: string, context?: LogContext): string {
+  const asyncCtx = loggerAsyncStorage.getStore() || {}
+  const mergedContext = { ...asyncCtx, ...context }
+
   if (IS_PRODUCTION) {
     return JSON.stringify({
       timestamp: new Date().toISOString(),
       level,
       message,
-      ...context,
+      ...mergedContext,
     })
   }
 
   const timestamp = new Date().toISOString().split('T')[1]?.replace('Z', '') ?? ''
   const prefix = `[${timestamp}] [${level.toUpperCase().padEnd(5)}]`
-  const ctxStr = context && Object.keys(context).length > 0
-    ? ` ${JSON.stringify(context)}`
+  const ctxStr = Object.keys(mergedContext).length > 0
+    ? ` ${JSON.stringify(mergedContext)}`
     : ''
   return `${prefix} ${message}${ctxStr}`
 }

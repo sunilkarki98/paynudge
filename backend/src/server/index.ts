@@ -21,7 +21,7 @@ import cookieParser from 'cookie-parser'
 import apiRouter from './routes'
 import { errorHandler } from './middleware/error-handler'
 import { globalRateLimiter } from './middleware/rate-limiter'
-import { registerAllEventHandlers } from '@/modules/events/event-registry'
+// Event handlers are registered only in the worker process (worker-entry.ts)
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 
@@ -62,6 +62,15 @@ app.use(express.urlencoded({ extended: true }))
 // Parse cookies (for JWT token fallback)
 app.use(cookieParser())
 
+// Request Tracing (injects reqId into all subsequent logs)
+import { randomUUID } from 'crypto'
+import { loggerAsyncStorage } from '@/lib/logger'
+app.use((req, res, next) => {
+  const reqId = (req.headers['x-request-id'] as string) || randomUUID()
+  res.setHeader('x-request-id', reqId)
+  loggerAsyncStorage.run({ reqId }, () => next())
+})
+
 // Apply global rate limiting (100 req / min)
 app.use(globalRateLimiter)
 
@@ -95,9 +104,8 @@ app.use('/api', apiRouter)
 app.use(errorHandler)
 
 // ─── Start Server ────────────────────────────────────────
-
-// Register event handlers (shared with workers)
-registerAllEventHandlers()
+// Note: Event handlers are NOT registered here.
+// Only the worker process handles events from the Outbox to prevent duplicate processing.
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   log.info(`Express API server running on port ${PORT}`, {

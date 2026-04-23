@@ -28,6 +28,8 @@ export const createClientSchema = z.object({
   smsNumber: z.string().max(20).optional().nullable(),
   chasingProfile: z.enum(['STRICT', 'NORMAL', 'RELAXED']).optional(),
   contactChannel: z.enum(['EMAIL', 'WHATSAPP', 'SMS', 'BOTH', 'EMAIL_AND_SMS', 'ALL']).optional(),
+  behaviorType: z.string().max(50).optional().nullable(), // Added for intelligence
+  behaviorScore: z.number().int().optional().nullable(),
 })
 
 export const updateClientSchema = z.object({
@@ -37,6 +39,8 @@ export const updateClientSchema = z.object({
   smsNumber: z.string().max(20).optional().nullable(),
   chasingProfile: z.enum(['STRICT', 'NORMAL', 'RELAXED']).optional(),
   contactChannel: z.enum(['EMAIL', 'WHATSAPP', 'SMS', 'BOTH', 'EMAIL_AND_SMS', 'ALL']).optional(),
+  behaviorType: z.string().max(50).optional().nullable(),
+  behaviorScore: z.number().int().optional().nullable(),
 }).refine(data => Object.values(data).some(v => v !== undefined), {
   message: 'At least one field must be provided',
 })
@@ -63,6 +67,7 @@ export const createInvoiceSchema = z.object({
   smsNumber: z.string().max(20).optional().nullable(),
   chasingProfile: z.enum(['STRICT', 'NORMAL', 'RELAXED']).optional(),
   contactChannel: z.enum(['EMAIL', 'WHATSAPP', 'SMS', 'BOTH', 'EMAIL_AND_SMS', 'ALL']).optional(),
+  behaviorType: z.string().optional().nullable(), // Propagate behavior type from invoice create
 })
 
 export const updateInvoiceSchema = z.object({
@@ -82,6 +87,7 @@ export const updateInvoiceSchema = z.object({
   }, 'Invalid date').optional(),
   description: z.string().max(2000).optional().nullable(),
   status: z.enum(['PAID', 'UNPAID']).optional(),
+  state: z.string().optional(), // Allow manual state override
 }).refine(data => Object.values(data).some(v => v !== undefined), {
   message: 'At least one field must be provided',
 })

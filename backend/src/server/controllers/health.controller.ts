@@ -1,6 +1,10 @@
 import { Request, Response } from 'express'
 import { prisma } from '@/lib/prisma'
 import { checkRedisHealth } from '@/infrastructure/redis'
+import { getEmailQueue } from '@/modules/queues/email-queue'
+import { getSMSQueue } from '@/modules/queues/sms-queue'
+import { getWhatsAppQueue } from '@/modules/queues/whatsapp-queue'
+import { getOverdueCheckQueue } from '@/modules/queues/overdue-check-queue'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'health-controller' })
@@ -28,6 +32,22 @@ export async function getHealth(_req: Request, res: Response): Promise<void> {
       ? redisResult.value
       : { status: 'down' as const, latencyMs: 0 }
 
+    // Queue health
+    let queues = {}
+    if (redisHealth.status === 'up') {
+      try {
+        const [email, sms, whatsapp, overdue] = await Promise.all([
+          getEmailQueue().getJobCounts(),
+          getSMSQueue().getJobCounts(),
+          getWhatsAppQueue().getJobCounts(),
+          getOverdueCheckQueue().getJobCounts(),
+        ])
+        queues = { email, sms, whatsapp, overdue }
+      } catch (qErr) {
+        log.warn('Failed to fetch queue counts', { error: qErr instanceof Error ? qErr.message : String(qErr) })
+      }
+    }
+
     const overallStatus = dbHealth.status === 'up' && redisHealth.status === 'up'
       ? 'healthy'
       : 'degraded'
@@ -40,6 +60,7 @@ export async function getHealth(_req: Request, res: Response): Promise<void> {
       checks: {
         database: dbHealth,
         redis: redisHealth,
+        queues,
       },
     })
   } catch (error) {

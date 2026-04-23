@@ -4,6 +4,7 @@ import { QUEUE_NAMES } from '@/modules/queues/queue-names'
 import { WhatsAppJobData } from '@/modules/queues/whatsapp-queue'
 import { logger } from '@/lib/logger'
 import { withIdempotencyGuard } from '@/modules/queues/job-wrapper'
+import { prisma } from '@/lib/prisma'
 
 const log = logger.child({ module: 'whatsapp-worker' })
 
@@ -15,7 +16,7 @@ const log = logger.child({ module: 'whatsapp-worker' })
  */
 
 async function processWhatsAppJob(job: Job<WhatsAppJobData>) {
-  const { stage, whatsappNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
+  const { stage, whatsappNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone, customMessage } = job.data
 
   await withIdempotencyGuard('whatsapp', job, async (invoice) => {
     const { generateMessage } = await import('@/modules/ai/message-generator')
@@ -24,19 +25,20 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>) {
     const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
 
-    const generated = await generateMessage({
-      clientName,
-      amount,
-      dueDate,
-      stage,
-      daysOverdue,
-      paymentLink,
-      tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
-    })
-
-    // WhatsApp messages should be concise — use SMS text if available, 
-    // otherwise trim the plain text to 1000 chars (WhatsApp limit is 4096)
-    const textToSend = generated.smsText || generated.plainText.substring(0, 1000)
+    let textToSend = customMessage || ''
+    
+    if (!customMessage) {
+      const generated = await generateMessage({
+        clientName,
+        amount,
+        dueDate,
+        stage,
+        daysOverdue,
+        paymentLink,
+        tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+      })
+      textToSend = generated.smsText || generated.plainText.substring(0, 1000)
+    }
 
     const result = await sendWhatsApp({
       userId: invoice.userId,
@@ -57,6 +59,40 @@ async function processWhatsAppJob(job: Job<WhatsAppJobData>) {
 
     return { plainText: textToSend }
   })
+}
+
+async function onJobFailed(job: Job<WhatsAppJobData> | undefined, err: Error): Promise<void> {
+  if (!job) return
+
+  const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 5)
+
+  if (isLastAttempt) {
+    log.error('WhatsApp job permanently failed — dead letter', {
+      jobId: job.id,
+      invoiceId: job.data.invoiceId,
+      stage: job.data.stage,
+      attempts: job.attemptsMade,
+      error: err.message,
+    })
+
+    try {
+      await prisma.reminderLog.create({
+        data: {
+          invoiceId: job.data.invoiceId,
+          stage: job.data.stage,
+          status: 'dead_letter',
+          channel: 'whatsapp',
+          error: `Permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
+          jobId: job.id ?? null,
+          idempotencyKey: job.data.idempotencyKey,
+        },
+      })
+    } catch (logErr) {
+      log.error('Failed to log WhatsApp dead letter', {
+        error: logErr instanceof Error ? logErr.message : String(logErr),
+      })
+    }
+  }
 }
 
 export function startWhatsAppWorker() {
@@ -80,6 +116,7 @@ export function startWhatsAppWorker() {
       stage: job?.data.stage,
       error: err.message,
     })
+    onJobFailed(job, err)
   })
 
   worker.on('ready', () => {

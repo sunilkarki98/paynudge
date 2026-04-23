@@ -10,6 +10,7 @@ import trackingRoutes from './tracking.routes'
 import uploadRoutes from './upload.routes'
 import healthRoutes from './health.routes'
 import billingRoutes from './billing.routes'
+import webhookRoutes from './webhook.routes'
 
 /**
  * Central API router.
@@ -30,5 +31,6 @@ apiRouter.use('/track', trackingRoutes)
 apiRouter.use('/upload', uploadRoutes)
 apiRouter.use('/health', healthRoutes)
 apiRouter.use('/billing', billingRoutes)
+apiRouter.use('/webhooks', webhookRoutes)
 
 export default apiRouter

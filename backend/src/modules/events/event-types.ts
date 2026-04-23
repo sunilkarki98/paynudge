@@ -1,9 +1,5 @@
 /**
  * Event payload types for the invoice lifecycle.
- * 
- * Every event carries the minimum data needed for downstream
- * processing. Full invoice data is fetched from DB by workers
- * at processing time (not stored in the event) to avoid stale data.
  */
 
 export interface InvoiceCreatedEvent {
@@ -55,6 +51,8 @@ export interface InvoiceOverdueEvent {
   reminderTone: string
   chaseUntilPaid: boolean
   chaseIntervalDays: number
+  overrideChannels?: string[]
+  customMessage?: string
 }
 
 export interface InvoicePaidEvent {
@@ -84,6 +82,9 @@ export interface EventMap {
   'invoice.payment_due': InvoicePaymentDueEvent
   'invoice.overdue': InvoiceOverdueEvent
   'invoice.paid': InvoicePaidEvent
+  'invoice.voided': InvoicePaidEvent
+  'invoice.disputed': InvoicePaidEvent
+  'invoice.unverified_payment': InvoicePaidEvent
   'invoice.predue_warning': InvoicePredueWarningEvent
   'invoice.tracking_event': InvoiceTrackingEvent
 }

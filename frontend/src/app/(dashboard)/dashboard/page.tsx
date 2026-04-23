@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useApi } from '@/hooks/useApi'
+import { useRouter } from 'next/navigation'
 import StatsCard from '@/components/StatsCard'
 import StatusBadge from '@/components/StatusBadge'
 import Link from 'next/link'
@@ -18,6 +19,7 @@ interface DashboardData {
     amount: number | string
     dueDate: string
     status: string
+    state: string // Added state for FSM
     aiMetadata?: {
       riskScore: string
     }
@@ -41,6 +43,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const { apiFetch } = useApi()
+  const router = useRouter()
 
   useEffect(() => {
     const fetchData = async () => {
@@ -179,8 +182,14 @@ export default function DashboardPage() {
 
       {/* Recent Invoices */}
       <div className="glass-card rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-surface-border">
+        <div className="p-6 border-b border-surface-border flex justify-between items-center">
           <h3 className="text-lg font-semibold text-text-primary">Recent Invoices</h3>
+          <Link href="/invoices" className="text-sm font-medium text-primary-500 hover:text-primary-400 flex items-center gap-1 transition-colors">
+            View All
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -194,15 +203,20 @@ export default function DashboardPage() {
             </thead>
             <tbody>
               {data.recentInvoices.map((invoice) => (
-                <tr key={invoice.id} className="border-b border-surface-border table-row-hover">
+                <tr 
+                  key={invoice.id} 
+                  className="border-b border-surface-border table-row-hover cursor-pointer"
+                  onClick={() => router.push('/invoices')}
+                >
                   <td className="px-6 py-5 text-sm text-text-primary font-semibold">{invoice.clientName}</td>
                   <td className="px-6 py-5 text-sm text-text-secondary font-medium">{formatCurrency(invoice.amount)}</td>
                   <td className="px-6 py-5 text-sm text-text-secondary font-medium">
                     {new Date(invoice.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   </td>
                   <td className="px-6 py-5 flex flex-col gap-2 items-start">
-                    <StatusBadge status={invoice.status} dueDate={invoice.dueDate} />
-                    {invoice.aiMetadata && invoice.status !== 'PAID' && (
+                    {/* Using the new state field for accurate FSM badge rendering */}
+                    <StatusBadge state={invoice.state || invoice.status} dueDate={invoice.dueDate} />
+                    {invoice.aiMetadata && invoice.state !== 'PAID' && (
                       <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border shadow-sm ${
                         invoice.aiMetadata.riskScore === 'HIGH' ? 'bg-red-50 text-red-700 border-red-200' :
                         invoice.aiMetadata.riskScore === 'MEDIUM' ? 'bg-amber-50 text-amber-700 border-amber-200' :
@@ -216,8 +230,24 @@ export default function DashboardPage() {
               ))}
               {data.recentInvoices.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-text-secondary">
-                    No recent invoices found. Upload one to get started.
+                  <td colSpan={4} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center justify-center max-w-md mx-auto">
+                      <div className="w-16 h-16 bg-surface-raised rounded-full flex items-center justify-center mb-4 border border-surface-border">
+                        <svg className="w-8 h-8 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <h4 className="text-text-primary font-medium text-lg mb-2">No invoices found</h4>
+                      <p className="text-text-secondary text-sm mb-6 text-center">
+                        You haven't added any invoices yet. Upload your first invoice to start tracking and collecting payments.
+                      </p>
+                      <Link
+                        href="/invoices/new"
+                        className="bg-primary-600 hover:bg-primary-500 text-white px-6 py-2.5 rounded-xl font-medium transition-colors shadow-lg shadow-primary-500/20"
+                      >
+                        Upload First Invoice
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               )}

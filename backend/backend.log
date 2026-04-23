@@ -1,0 +1,1385 @@
+
+> freelancerinvoicechaser-backend@0.1.0 dev
+> concurrently -n api,worker -c green,yellow "npm run server:dev" "npm run worker:dev"
+
+[api] 
+[api] > freelancerinvoicechaser-backend@0.1.0 server:dev
+[api] > npx tsx --watch src/server/index.ts
+[api] 
+[worker] 
+[worker] > freelancerinvoicechaser-backend@0.1.0 worker:dev
+[worker] > npx tsx --watch src/workers/worker-entry.ts
+[worker] 
+[worker] [23:43:45.225] [INFO ] Starting worker process... {"module":"worker-entry","pid":4833,"nodeVersion":"v20.20.2","env":"development"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.created"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.overdue"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.paid"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.voided"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.disputed"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.unverified_payment"}
+[worker] [23:43:45.228] [INFO ] Notification subscribers registered with FSM support {"module":"notification-subscriber"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.created"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.payment_due"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.overdue"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.paid"}
+[worker] [23:43:45.228] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.predue_warning"}
+[worker] [23:43:45.229] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.tracking_event"}
+[worker] [23:43:45.229] [INFO ] Audit subscribers registered {"module":"audit-subscriber"}
+[worker] [23:43:45.229] [INFO ] Event handler registered {"module":"event-bus","event":"invoice.paid"}
+[worker] [23:43:45.229] [INFO ] Behavior Learning Subscriber initialized {"module":"behavior-subscriber"}
+[worker] [23:43:45.229] [INFO ] All event handlers registered {"module":"event-registry"}
+[worker] [23:43:45.237] [INFO ] Email worker started {"module":"email-worker","concurrency":5,"queue":"invoice-chaser-email"}
+[worker] [23:43:45.238] [INFO ] FSM-Enabled Overdue check worker started {"module":"overdue-check-worker","concurrency":10,"queue":"invoice-chaser-overdue-check"}
+[worker] [23:43:45.239] [INFO ] Starting outbox worker poller {"module":"outbox-worker","baseIntervalMs":2000,"maxIntervalMs":15000}
+[worker] [23:43:45.240] [INFO ] All workers started successfully {"module":"worker-entry","workers":["email","overdue-check","whatsapp","sms","outbox"]}
+[worker] [23:43:45.403] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:45.404] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:45.618] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:45.619] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:46.020] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:46.020] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:46.622] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:46.622] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:47.427] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:47.427] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:48.432] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:48.434] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[api] [23:43:49.232] [INFO ] Express API server running on port 4000 {"module":"server","port":4000,"env":"development","pid":4834}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:49.641] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:49.642] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:51.043] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:51.043] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:52.648] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:52.648] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:54.450] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:54.451] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:56.456] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:56.456] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:43:58.658] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:43:58.658] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:01.061] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:01.062] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:03.668] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:03.668] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:06.477] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:06.477] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:09.492] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:09.492] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:12.716] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:12.720] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:16.405] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:16.409] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:20.246] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:20.247] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:24.204] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:24.205] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:28.318] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:28.334] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:32.877] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:32.879] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:38.026] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:38.027] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:44.616] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:44.618] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:49.523] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:49.545] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:44:55.499] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:44:55.524] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] [23:45:01.520] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] [23:45:01.633] [ERROR] Email worker error {"module":"email-worker","error":"connect ECONNREFUSED 127.0.0.1:6379"}
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }
+[worker] Error: connect ECONNREFUSED 127.0.0.1:6379
+[worker]     at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1611:16) {
+[worker]   errno: -111,
+[worker]   code: 'ECONNREFUSED',
+[worker]   syscall: 'connect',
+[worker]   address: '127.0.0.1',
+[worker]   port: 6379
+[worker] }

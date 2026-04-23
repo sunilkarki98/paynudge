@@ -29,15 +29,20 @@ export interface RateLimitResult {
  * @param windowSeconds - Window size in seconds
  * @returns Whether the request is allowed, remaining tokens, and reset time
  */
+// In-memory fallback if Redis is unreachable
+const memoryFallback = new Map<string, number[]>()
+const MAX_FALLBACK_KEYS = 10000
+
 export async function checkRateLimit(
   key: string,
   limit: number,
   windowSeconds: number
 ): Promise<RateLimitResult> {
+  const now = Date.now()
+  const windowStart = now - windowSeconds * 1000
+
   try {
     const redis = getRedisConnection()
-    const now = Date.now()
-    const windowStart = now - windowSeconds * 1000
     const fullKey = `ratelimit:${key}`
 
     // Atomic pipeline: prune old entries, add current, count, get TTL
@@ -64,13 +69,30 @@ export async function checkRateLimit(
       resetInSeconds: windowSeconds,
     }
   } catch (err) {
-    // If Redis is down, allow the request (fail open) but log the error.
-    // In production, you may want to fail closed instead.
-    log.error('Rate limit check failed, allowing request', {
+    // Redis failed. Fallback to in-memory sliding window.
+    log.error('Redis rate limit check failed, using memory fallback', {
       key,
       error: err instanceof Error ? err.message : String(err),
     })
-    return { allowed: true, remaining: limit, resetInSeconds: windowSeconds }
+
+    if (memoryFallback.size > MAX_FALLBACK_KEYS) {
+      memoryFallback.clear() // Prevent memory leak if attacked during Redis outage
+    }
+
+    let timestamps = memoryFallback.get(key) || []
+    timestamps = timestamps.filter(t => t > windowStart)
+    timestamps.push(now)
+    memoryFallback.set(key, timestamps)
+
+    const count = timestamps.length
+    const allowed = count <= limit
+    const remaining = Math.max(0, limit - count)
+
+    if (!allowed) {
+      log.warn('Rate limit exceeded (memory fallback)', { key, count, limit })
+    }
+
+    return { allowed, remaining, resetInSeconds: windowSeconds }
   }
 }
 

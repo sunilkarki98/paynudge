@@ -10,6 +10,7 @@ export interface BaseReminderJobData {
   stage: number
   idempotencyKey: string
   reminderTone?: string
+  customMessage?: string
 }
 
 export interface BusinessLogicResult {
@@ -113,10 +114,7 @@ export async function withIdempotencyGuard<T extends BaseReminderJobData>(
       },
     })
 
-    // Dispatch audit event dynamically
-    const { eventBus } = await import('@/modules/events/event-bus')
-    eventBus.emit('invoice.overdue', { invoiceId, stage } as never)
-    
+    // Log the audit event for the sent reminder
     await prisma.invoiceEvent.create({
       data: {
         invoiceId,

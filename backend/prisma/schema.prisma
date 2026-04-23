@@ -46,6 +46,32 @@ enum SubscriptionTier {
   PRO
 }
 
+enum InvoiceState {
+  DRAFT               // Still being edited
+  APPROVAL_REQUIRED   // Needs a second set of eyes before sending
+  PENDING             // Sent to client, awaiting due date
+  DUE_SOON            // Pre-due warning stage
+  DUE                 // Due today
+  GRACE_PERIOD        // Past due, silent monitoring
+  OVERDUE_L1          // Polite nudge
+  OVERDUE_L2          // Firm nudge
+  OVERDUE_L3          // Serious escalation
+  FINAL_NOTICE        // Last automated attempt
+  RECURRING_CHASE     // Infinite loop (if enabled)
+  UNVERIFIED_PAYMENT  // Client claimed payment (Reminders paused)
+  ESCROW_HELD         // Funds are in escrow
+  PARTIALLY_PAID      // Payment received, balance remains
+  OVERPAID            // Client paid too much, needs credit/refund
+  PAID                // Success
+  REFUNDED            // Money returned to client
+  DISPUTED            // Client flagged a problem
+  LEGAL_HOLD          // Paused for legal/contractual review
+  DEBT_COLLECTION     // Handled by external agency
+  VOIDED              // Canceled/Invalid
+  WRITTEN_OFF         // Bad debt, for accounting
+  MANUAL_REVIEW       // System error (bounce/API failure)
+}
+
 // ─── User ────────────────────────────────────────────────
 
 model User {
@@ -123,6 +149,14 @@ model Invoice {
   dueDate            DateTime
   description        String?
   status             InvoiceStatus    @default(UNPAID)
+  state              InvoiceState     @default(DRAFT)
+  stateMetadata      Json?            // Stores reasons for state changes, bounce errors, etc.
+  lastStateChangeAt  DateTime         @default(now())
+  
+  // Financial Intelligence
+  balance            Decimal          @default(0) @db.Decimal(12, 2)
+  version            Int              @default(1)
+  
   invoiceNumber      String?          // User-visible invoice number (e.g., INV-001)
   
   // Contact Configuration Snapshot
@@ -280,11 +314,12 @@ model SystemSetting {
 // ─── Transactional Outbox ────────────────────────────────
 
 model OutboxEvent {
-  id        String   @id @default(cuid())
-  eventType String   // e.g., "invoice.created", "invoice.paid"
-  payload   Json     // The event data payload
-  processed Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  eventType   String    // e.g., "invoice.created", "invoice.paid"
+  payload     Json      // The event data payload
+  processed   Boolean   @default(false)
+  processedAt DateTime? // Set when claimed by outbox worker — retained for audit
+  createdAt   DateTime  @default(now())
 
   @@index([processed, createdAt])
 }

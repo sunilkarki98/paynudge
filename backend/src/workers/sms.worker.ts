@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma'
 const log = logger.child({ module: 'sms-worker' })
 
 async function processSMSJob(job: Job<SMSJobData>) {
-  const { invoiceId, stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
+  const { invoiceId, stage, smsNumber, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone, customMessage } = job.data
 
   await withIdempotencyGuard('sms', job, async (invoice) => {
     const { generateMessage } = await import('@/modules/ai/message-generator')
@@ -27,21 +27,26 @@ async function processSMSJob(job: Job<SMSJobData>) {
     const baseUrl = process.env.FRONTEND_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
 
-    const generated = await generateMessage({
-      clientName,
-      amount,
-      dueDate,
-      stage,
-      daysOverdue,
-      paymentLink,
-      tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
-      behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
-      behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
-      overrideTone: invoiceRecord?.client?.overrideTone || undefined,
-      shieldMode: invoiceRecord?.user?.shieldMode || false,
-    })
+    let textToSend = customMessage || ''
+    let persuasionStrategy = 'Manual Override'
 
-    const textToSend = generated.smsText || generated.plainText.substring(0, 160)
+    if (!customMessage) {
+      const generated = await generateMessage({
+        clientName,
+        amount,
+        dueDate,
+        stage,
+        daysOverdue,
+        paymentLink,
+        tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+        behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
+        behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
+        overrideTone: invoiceRecord?.client?.overrideTone || undefined,
+        shieldMode: invoiceRecord?.user?.shieldMode || false,
+      })
+      textToSend = generated.smsText || generated.plainText.substring(0, 160)
+      persuasionStrategy = generated.persuasionStrategy || 'Standard'
+    }
 
     // Attempt sending using dual-mode Twilio
     const result = await sendSMS({
@@ -56,9 +61,43 @@ async function processSMSJob(job: Job<SMSJobData>) {
 
     return { 
       plainText: textToSend,
-      persuasionStrategy: generated.persuasionStrategy
+      persuasionStrategy
     }
   })
+}
+
+async function onJobFailed(job: Job<SMSJobData> | undefined, err: Error): Promise<void> {
+  if (!job) return
+
+  const isLastAttempt = job.attemptsMade >= (job.opts.attempts ?? 5)
+
+  if (isLastAttempt) {
+    log.error('SMS job permanently failed — dead letter', {
+      jobId: job.id,
+      invoiceId: job.data.invoiceId,
+      stage: job.data.stage,
+      attempts: job.attemptsMade,
+      error: err.message,
+    })
+
+    try {
+      await prisma.reminderLog.create({
+        data: {
+          invoiceId: job.data.invoiceId,
+          stage: job.data.stage,
+          status: 'dead_letter',
+          channel: 'sms',
+          error: `Permanently failed after ${job.attemptsMade} attempts: ${err.message}`,
+          jobId: job.id ?? null,
+          idempotencyKey: job.data.idempotencyKey,
+        },
+      })
+    } catch (logErr) {
+      log.error('Failed to log SMS dead letter', {
+        error: logErr instanceof Error ? logErr.message : String(logErr),
+      })
+    }
+  }
 }
 
 export function startSMSWorker() {
@@ -82,6 +121,7 @@ export function startSMSWorker() {
       stage: job?.data.stage,
       error: err.message,
     })
+    onJobFailed(job, err)
   })
 
   worker.on('ready', () => {

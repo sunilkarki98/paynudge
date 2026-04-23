@@ -2,7 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from '@/lib/prisma'
 import { createInvoiceSchema, updateInvoiceSchema, paginationSchema, validateBody } from '@/lib/validation'
 import { logger } from '@/lib/logger'
-import { Prisma } from '@prisma/client'
+import { Prisma, InvoiceState } from '@prisma/client'
 import { 
   createInvoice, 
   markInvoiceAsPaid, 
@@ -93,6 +93,7 @@ export async function createInvoiceHandler(req: Request, res: Response): Promise
       smsNumber: finalSms,
       chasingProfile: finalChasing,
       contactChannel: finalContact,
+      behaviorType: validation.data.behaviorType, // Pass behavior type
     })
 
     res.status(201).json(invoice)
@@ -186,9 +187,24 @@ export async function updateInvoice(req: Request, res: Response): Promise<void> 
     if (data.dueDate !== undefined) updateData.dueDate = new Date(data.dueDate)
     if (data.description !== undefined) updateData.description = data.description
     if (data.status !== undefined) updateData.status = data.status
+    if (data.state !== undefined) {
+      // Validate state against the InvoiceState enum to prevent arbitrary strings
+      const validStates = Object.values(InvoiceState) as string[]
+      if (!validStates.includes(data.state)) {
+        res.status(400).json({ error: `Invalid state: ${data.state}. Must be one of: ${validStates.join(', ')}` })
+        return
+      }
+      updateData.state = data.state
+      updateData.lastStateChangeAt = new Date()
+      updateData.stateMetadata = { reason: 'Manual override via dashboard' }
+    }
 
     if (Object.keys(updateData).length > 0) {
       const invoice = await updateInvoiceDetails(id, req.user!.userId, updateData)
+      if (!invoice) {
+        res.status(404).json({ error: 'Invoice not found' })
+        return
+      }
       log.info('Invoice updated', { invoiceId: id, changes: Object.keys(updateData) })
       res.json(invoice)
       return
@@ -225,7 +241,8 @@ export async function deleteInvoiceHandler(req: Request, res: Response): Promise
 export async function sendReminderHandler(req: Request, res: Response): Promise<void> {
   try {
     const id = req.params.id as string
-    const result = await sendManualReminder(id, req.user!.userId)
+    const { overrideChannels, customMessage } = req.body || {}
+    const result = await sendManualReminder(id, req.user!.userId, overrideChannels, customMessage)
 
     if (!result.success) {
       res.status(500).json({

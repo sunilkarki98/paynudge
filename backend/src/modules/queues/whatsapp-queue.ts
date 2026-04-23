@@ -15,6 +15,7 @@ export interface WhatsAppJobData {
   daysOverdue: number
   paymentLinkToken?: string
   reminderTone?: string
+  customMessage?: string
   idempotencyKey: string
 }
 

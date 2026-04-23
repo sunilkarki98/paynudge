@@ -13,6 +13,7 @@ interface Invoice {
   dueDate: string
   description: string | null
   status: string
+  state: string // Added state field
   reminderStage: number
   whatsappNumber?: string | null
   smsNumber?: string | null
@@ -25,8 +26,6 @@ interface HistoryEvent {
   id: string
   _type: 'reminder' | 'tracking' | 'event'
   _date: string
-
-  // Reminder fields
   stage?: number
   status?: string
   channel?: string | null
@@ -35,14 +34,8 @@ interface HistoryEvent {
   persuasionStrategy?: string | null
   error?: string | null
   sentAt?: string
-
-  // Tracking fields
   event?: string
-  
-  // Event fields
   eventType?: string
-  
-  // Shared Tracking/Event fields
   metadata?: any
   createdAt?: string
 }
@@ -81,12 +74,15 @@ export default function InvoicesPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const { apiFetch } = useApi()
 
-  // Reminder states
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null)
   const [reminderFeedback, setReminderFeedback] = useState<{ id: string; type: 'success' | 'error'; message: string } | null>(null)
   const [historyInvoice, setHistoryInvoice] = useState<Invoice | null>(null)
   const [historyData, setHistoryData] = useState<HistoryEvent[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
+
+  const [nudgeModalInvoice, setNudgeModalInvoice] = useState<Invoice | null>(null)
+  const [nudgeChannels, setNudgeChannels] = useState<{ email: boolean; sms: boolean; whatsapp: boolean }>({ email: true, sms: false, whatsapp: false })
+  const [nudgeMessage, setNudgeMessage] = useState('')
 
   const fetchInvoices = useCallback(async () => {
     try {
@@ -116,7 +112,6 @@ export default function InvoicesPage() {
     fetchInvoices()
   }, [fetchInvoices])
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
   }, [filterStatus, searchTerm])
@@ -146,8 +141,8 @@ export default function InvoicesPage() {
   }
 
   const handleToggleStatus = async (invoice: Invoice) => {
-    const normalizedStatus = invoice.status.toUpperCase()
-    const newStatus = normalizedStatus === 'PAID' ? 'UNPAID' : 'PAID'
+    const currentState = (invoice.state || invoice.status).toUpperCase()
+    const newStatus = currentState === 'PAID' ? 'UNPAID' : 'PAID'
     await apiFetch(`/api/invoices/${invoice.id}`, {
       method: 'PUT',
       body: JSON.stringify({ status: newStatus }),
@@ -160,15 +155,36 @@ export default function InvoicesPage() {
     setModalOpen(true)
   }
 
-  const handleSendReminder = async (invoice: Invoice) => {
+  const submitManualNudge = async () => {
+    if (!nudgeModalInvoice) return
+    const invoice = nudgeModalInvoice
+    
+    const overrideChannels: string[] = []
+    if (nudgeChannels.email) overrideChannels.push('EMAIL')
+    if (nudgeChannels.sms) overrideChannels.push('SMS')
+    if (nudgeChannels.whatsapp) overrideChannels.push('WHATSAPP')
+    
+    if (overrideChannels.length === 0) {
+      alert("Please select at least one channel.")
+      return
+    }
+
     setSendingReminderId(invoice.id)
     setReminderFeedback(null)
+    setNudgeModalInvoice(null)
+    
     try {
-      const result = await apiFetch(`/api/invoices/${invoice.id}/remind`, { method: 'POST' })
+      await apiFetch(`/api/invoices/${invoice.id}/remind`, { 
+        method: 'POST',
+        body: JSON.stringify({ 
+          overrideChannels, 
+          customMessage: nudgeMessage.trim() !== '' ? nudgeMessage.trim() : undefined 
+        })
+      })
       setReminderFeedback({
         id: invoice.id,
         type: 'success',
-        message: `Sent via ${result.channels?.join(', ') || 'email'}`,
+        message: `Queued via ${overrideChannels.join(', ')}`,
       })
       setTimeout(() => setReminderFeedback(null), 4000)
     } catch (err) {
@@ -183,6 +199,16 @@ export default function InvoicesPage() {
     }
   }
 
+  const handleOpenNudgeModal = (invoice: Invoice) => {
+    setNudgeModalInvoice(invoice)
+    setNudgeMessage('')
+    setNudgeChannels({ 
+      email: true, 
+      sms: !!invoice.smsNumber, 
+      whatsapp: !!invoice.whatsappNumber 
+    })
+  }
+
   const handleViewHistory = async (invoice: Invoice) => {
     setHistoryInvoice(invoice)
     setHistoryLoading(true)
@@ -195,9 +221,6 @@ export default function InvoicesPage() {
       setHistoryLoading(false)
     }
   }
-
-  // Using server-side pagination and filtering, so we don't need client-filter
-  // (Previously this was filtering 'overdue' and 'pending' locally while fetching 'unpaid' globally)
 
   if (loading) {
     return (
@@ -285,7 +308,7 @@ export default function InvoicesPage() {
                 </tr>
               ) : (
                 invoices.map((invoice) => {
-                  const isPaid = invoice.status.toUpperCase() === 'PAID'
+                  const isPaid = invoice.state === 'PAID'
                   return (
                   <tr key={invoice.id} className="border-b border-surface-border table-row-hover">
                     <td className="px-6 py-5 text-sm font-mono text-text-muted">
@@ -302,7 +325,7 @@ export default function InvoicesPage() {
                       {new Date(invoice.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </td>
                     <td className="px-6 py-5">
-                      <StatusBadge status={invoice.status} dueDate={invoice.dueDate} />
+                      <StatusBadge state={invoice.state || invoice.status} dueDate={invoice.dueDate} />
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex gap-1.5">
@@ -321,11 +344,10 @@ export default function InvoicesPage() {
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center justify-end gap-2">
-                        {/* Send Reminder (only for unpaid) */}
                         {!isPaid && (
                           <div className="relative">
                             <button
-                              onClick={() => handleSendReminder(invoice)}
+                              onClick={() => handleOpenNudgeModal(invoice)}
                               disabled={sendingReminderId === invoice.id}
                               className="p-2 rounded-xl text-blue-600 hover:bg-blue-500/15 hover:text-blue-700 disabled:opacity-50 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
                               title="Trigger strategic nudge now"
@@ -341,7 +363,6 @@ export default function InvoicesPage() {
                                 </svg>
                               )}
                             </button>
-                            {/* Inline feedback tooltip */}
                             {reminderFeedback?.id === invoice.id && (
                               <div className={`absolute bottom-full right-0 mb-2 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap shadow-lg animate-fade-in z-10 ${
                                 reminderFeedback.type === 'success'
@@ -353,7 +374,6 @@ export default function InvoicesPage() {
                             )}
                           </div>
                         )}
-                        {/* View History */}
                         <button
                           onClick={() => handleViewHistory(invoice)}
                           className="p-2 rounded-xl text-text-secondary hover:text-primary-600 hover:bg-primary-500/15 transition-all duration-200 hover:scale-110 active:scale-95 hover:shadow-sm hover:-translate-y-0.5"
@@ -403,7 +423,6 @@ export default function InvoicesPage() {
           </table>
         </div>
 
-        {/* Pagination Controls */}
         {pagination.totalPages > 1 && (
           <div className="flex items-center justify-between p-4 border-t border-surface-border">
             <p className="text-sm text-text-secondary">
@@ -428,9 +447,80 @@ export default function InvoicesPage() {
           </div>
         )}
       </div>
+
+      {/* Manual Nudge Modal */}
+      {nudgeModalInvoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 modal-backdrop" onClick={() => setNudgeModalInvoice(null)}>
+          <div 
+            className="bg-surface-base w-full max-w-lg rounded-2xl shadow-2xl border border-surface-border overflow-hidden animate-slide-up"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-surface-border flex justify-between items-center bg-surface-raised">
+              <div>
+                <h3 className="text-xl font-bold text-text-primary">Send Strategic Nudge</h3>
+                <p className="text-sm text-text-secondary mt-1">To: {nudgeModalInvoice.clientName}</p>
+              </div>
+              <button onClick={() => setNudgeModalInvoice(null)} className="p-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-surface-card">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Channel Selection */}
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-3">Select Channels</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={nudgeChannels.email} onChange={e => setNudgeChannels({...nudgeChannels, email: e.target.checked})} className="rounded text-primary-600 focus:ring-primary-500 bg-surface-base border-surface-border" />
+                    <span className="text-sm font-medium text-text-secondary">Email</span>
+                  </label>
+                  <label className={`flex items-center gap-2 ${!nudgeModalInvoice.smsNumber ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <input type="checkbox" checked={nudgeChannels.sms} onChange={e => setNudgeChannels({...nudgeChannels, sms: e.target.checked})} disabled={!nudgeModalInvoice.smsNumber} className="rounded text-primary-600 focus:ring-primary-500 bg-surface-base border-surface-border" />
+                    <span className="text-sm font-medium text-text-secondary">SMS</span>
+                  </label>
+                  <label className={`flex items-center gap-2 ${!nudgeModalInvoice.whatsappNumber ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                    <input type="checkbox" checked={nudgeChannels.whatsapp} onChange={e => setNudgeChannels({...nudgeChannels, whatsapp: e.target.checked})} disabled={!nudgeModalInvoice.whatsappNumber} className="rounded text-primary-600 focus:ring-primary-500 bg-surface-base border-surface-border" />
+                    <span className="text-sm font-medium text-text-secondary">WhatsApp</span>
+                  </label>
+                </div>
+                {(!nudgeModalInvoice.smsNumber || !nudgeModalInvoice.whatsappNumber) && (
+                  <p className="text-xs text-amber-600 mt-2">Some channels are disabled because the client is missing a phone number.</p>
+                )}
+              </div>
+
+              {/* Custom Message */}
+              <div>
+                <label className="block text-sm font-medium text-text-primary mb-2">Custom Message (Optional)</label>
+                <textarea
+                  className="w-full bg-surface-raised border border-surface-border rounded-xl px-4 py-3 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-shadow min-h-[120px]"
+                  placeholder="Leave blank to let the AI generate the message based on the client's profile..."
+                  value={nudgeMessage}
+                  onChange={e => setNudgeMessage(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-surface-border flex justify-end gap-3 bg-surface-raised">
+              <button
+                onClick={() => setNudgeModalInvoice(null)}
+                className="px-5 py-2.5 rounded-xl text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-card transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitManualNudge}
+                className="bg-primary-600 hover:bg-primary-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium shadow-lg shadow-primary-500/20 transition-all active:scale-95"
+              >
+                Send Nudge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
 
-    {/* Invoice Modal — rendered outside animated div to fix fixed positioning */}
     <InvoiceModal
       isOpen={modalOpen}
       onClose={() => { setModalOpen(false); setEditInvoice(null) }}
@@ -453,14 +543,12 @@ export default function InvoicesPage() {
       clients={clients}
     />
 
-    {/* Reminder History Modal */}
     {historyInvoice && (
       <div className="fixed inset-0 z-50 flex items-start justify-center p-4 sm:p-6 pt-6 sm:pt-8 modal-backdrop" onClick={() => setHistoryInvoice(null)}>
         <div
           className="w-full max-w-lg bg-white rounded-2xl shadow-2xl animate-fade-in flex flex-col max-h-[calc(100vh-5rem)]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-surface-border shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-text-primary">Strategic Intelligence Log</h2>
@@ -475,7 +563,6 @@ export default function InvoicesPage() {
             </button>
           </div>
 
-          {/* Body */}
           <div className="p-6 overflow-y-auto flex-1 min-h-0">
             {historyLoading ? (
               <div className="flex items-center justify-center py-12">
@@ -496,7 +583,6 @@ export default function InvoicesPage() {
                       <div key={`reminder-${log.id}`} className="p-4 rounded-xl border border-surface-border bg-surface-base hover:bg-surface-raised transition-colors">
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
-                            {/* Status badge */}
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
                               log.status === 'sent'
                                 ? 'bg-green-100 text-green-700'
@@ -514,13 +600,11 @@ export default function InvoicesPage() {
                               )}
                               {log.status}
                             </span>
-                            {/* Channel */}
                             {log.channel && (
                               <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
                                 {log.channel}
                               </span>
                             )}
-                            {/* Stage */}
                             <span className="text-xs text-text-muted">
                               {log.stage === 0 ? 'Manual' : `Stage ${log.stage}`}
                             </span>
@@ -530,11 +614,9 @@ export default function InvoicesPage() {
                             {new Date(log._date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        {/* Message preview */}
                         {log.messageBody && (
                           <p className="text-sm text-text-secondary line-clamp-2 mt-2">{log.messageBody}</p>
                         )}
-                        {/* Persuasion Strategy */}
                         {log.persuasionStrategy && (
                           <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-50 text-purple-700 text-xs font-medium border border-purple-100">
                             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -543,7 +625,6 @@ export default function InvoicesPage() {
                             {log.persuasionStrategy}
                           </div>
                         )}
-                        {/* Error */}
                         {log.error && (
                           <p className="text-xs text-red-500 mt-1">Error: {log.error}</p>
                         )}

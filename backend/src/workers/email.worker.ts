@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { withIdempotencyGuard } from '@/modules/queues/job-wrapper'
 import type { EmailJobData } from '@/modules/queues/email-queue'
+import type { Tone } from '@/modules/ai/message-generator'
 
 const log = logger.child({ module: 'email-worker' })
 
@@ -33,7 +34,7 @@ const log = logger.child({ module: 'email-worker' })
  */
 
 async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
-  const { invoiceId, stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone } = job.data
+  const { invoiceId, stage, clientEmail, clientName, amount, dueDate, daysOverdue, paymentLinkToken, reminderTone, customMessage } = job.data
 
   await withIdempotencyGuard('email', job, async (invoice) => {
     // Dynamic import to prevent circular deps during worker boot
@@ -54,26 +55,51 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
     const paymentLink = paymentLinkToken ? `${baseUrl}/pay/${paymentLinkToken}` : undefined
     const trackingPixelUrl = `${baseUrl}/api/track/email?invoice=${invoice.id}&stage=${stage}&t=${Date.now()}`
 
-    const generated = await generateMessage({
-      clientName,
-      amount,
-      dueDate,
-      stage,
-      daysOverdue,
-      paymentLink,
-      tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
-      behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
-      behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
-      overrideTone: invoiceRecord?.client?.overrideTone || undefined,
-      shieldMode: invoiceRecord?.user?.shieldMode || false,
-    })
+    let finalSubject = ''
+    let finalHtmlBody = ''
+    let finalPlainText = ''
+    let persuasionStrategy = 'Manual Override'
+
+    if (customMessage) {
+      finalSubject = `Update regarding Invoice for ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(amount))}`
+      finalPlainText = customMessage
+      // Wrap the custom message in the standard HTML template
+      const { buildEmailHtml } = await import('@/modules/templates/fallback.template')
+      finalHtmlBody = buildEmailHtml(finalSubject, customMessage.replace(/\n/g, '<br/>'), { 
+        clientName,
+        amount: Number(amount),
+        dueDate,
+        stage,
+        tone: (reminderTone as Tone) || 'PROFESSIONAL',
+        paymentLink,
+        invoiceNumber: invoiceRecord?.invoiceNumber || undefined
+      })
+    } else {
+      const generated = await generateMessage({
+        clientName,
+        amount,
+        dueDate,
+        stage,
+        daysOverdue,
+        paymentLink,
+        tone: (reminderTone as 'FRIENDLY' | 'PROFESSIONAL' | 'FIRM') || 'PROFESSIONAL',
+        behaviorProfile: invoiceRecord?.client?.behaviorProfile || 'UNKNOWN',
+        behaviorType: invoiceRecord?.client?.behaviorType || 'UNKNOWN',
+        overrideTone: invoiceRecord?.client?.overrideTone || undefined,
+        shieldMode: invoiceRecord?.user?.shieldMode || false,
+      })
+      finalSubject = generated.subject
+      finalHtmlBody = generated.htmlBody
+      finalPlainText = generated.plainText
+      persuasionStrategy = generated.persuasionStrategy || 'Standard'
+    }
 
     const result = await sendEmail({
       userId: invoice.userId,
       to: clientEmail,
-      subject: generated.subject,
-      htmlBody: generated.htmlBody,
-      plainText: generated.plainText,
+      subject: finalSubject,
+      htmlBody: finalHtmlBody,
+      plainText: finalPlainText,
       trackingPixelUrl,
     })
 
@@ -82,8 +108,8 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
     }
 
     return { 
-      plainText: generated.plainText,
-      persuasionStrategy: generated.persuasionStrategy 
+      plainText: finalPlainText,
+      persuasionStrategy 
     }
   })
 }

@@ -1,50 +1,37 @@
 import { Worker, Job } from 'bullmq'
 import { createRedisConnection } from '@/infrastructure/redis'
 import { QUEUE_NAMES } from '@/modules/queues/queue-names'
-import { eventBus } from '@/modules/events/event-bus'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
 import { scheduleRecurringCheck } from '@/modules/queues/overdue-check-queue'
 import { determineNextAction } from '@/modules/ai/next-action-engine'
+import { transitionInvoice, InvoiceFSMEvent } from '@/modules/invoice/invoice.fsm'
 import type { OverdueCheckJobData } from '@/modules/queues/overdue-check-queue'
 
 const log = logger.child({ module: 'overdue-check-worker' })
 
 /**
- * Overdue Check Worker — checks if invoices are still unpaid at overdue checkpoints.
+ * Overdue Check Worker — Refactored to use Finite State Machine (FSM).
  * 
- * This replaces the cron's "scan all invoices" approach with targeted,
- * per-invoice checks scheduled at invoice creation time.
- * 
- * When an invoice is still unpaid at a checkpoint:
- *  - Emits invoice.overdue event with daysOverdue and stage
- *  - The notification subscriber picks up the event and enqueues an email job
- * 
- * When an invoice has been paid:
- *  - Does nothing. The job completes silently.
- *  - The paid event handler should have already removed this job,
- *    but we handle the race case gracefully.
+ * Instead of complex if/else blocks, this worker now delegates the lifecycle 
+ * logic to the transitionInvoice engine.
  */
-
 async function processOverdueCheck(job: Job<OverdueCheckJobData>): Promise<void> {
-  const { invoiceId, userId, clientEmail, clientName, amount, dueDate, daysOverdue, stage, contactChannel, whatsappNumber, smsNumber, chaseUntilPaid, chaseIntervalDays, paymentLinkToken, reminderTone } = job.data
+  const { 
+    invoiceId, daysOverdue, 
+    chaseUntilPaid, chaseIntervalDays, 
+    contactChannel
+  } = job.data
 
-  log.info('Processing overdue check', {
-    jobId: job.id,
-    invoiceId,
-    daysOverdue,
-    stage,
-  })
+  log.info('Processing FSM-driven overdue check', { jobId: job.id, invoiceId, state: daysOverdue })
 
-  // Check current invoice status
+  // 1. Fetch current context
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
-    select: {
-      id: true,
-      status: true,
-      reminderStage: true,
-      clientId: true,
-      aiMetadata: true,
+    include: { 
+      client: { select: { behaviorType: true, engagementScore: true, behaviorProfile: true } },
+      user: { select: { shieldMode: true } },
+      aiMetadata: { select: { riskScore: true } }
     },
   })
 
@@ -53,124 +40,109 @@ async function processOverdueCheck(job: Job<OverdueCheckJobData>): Promise<void>
     return
   }
 
-  if (invoice.status === 'PAID') {
-    log.info('Invoice already paid, skipping overdue check', {
-      invoiceId,
-      daysOverdue,
-    })
+  // 2. Terminal State Safety
+  if (['PAID', 'VOIDED', 'WRITTEN_OFF'].includes(invoice.state)) {
+    log.info('Invoice in terminal state, skipping check', { invoiceId, state: invoice.state })
     return
   }
 
-  // Determine user settings and client behavior
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { shieldMode: true } })
-  const shieldMode = user?.shieldMode || false
-
-  let behaviorType = 'UNKNOWN'
-  let engagementScore = 0
-
-  if (invoice.clientId) {
-    const client = await prisma.client.findUnique({
-      where: { id: invoice.clientId },
-      select: { behaviorType: true, engagementScore: true }
-    })
-    
-    if (client) {
-      behaviorType = client.behaviorType || 'UNKNOWN'
-      engagementScore = client.engagementScore ? Number(client.engagementScore) : 0
-    }
-  }
-
+  // 3. AI Behavioral Recommendation
+  const behaviorType = invoice.client?.behaviorType || 'UNKNOWN'
+  const engagementScore = invoice.client?.engagementScore ? Number(invoice.client?.engagementScore) : 0
+  
   const decision = determineNextAction({
-    riskScore: invoice.aiMetadata?.riskScore === 'HIGH' ? 80 : 50, // rough proxy
-    riskLevel: invoice.aiMetadata?.riskScore || 'MEDIUM',
+    riskScore: invoice.aiMetadata && (invoice.aiMetadata as any).riskScore === 'HIGH' ? 80 : 50,
+    riskLevel: (invoice.aiMetadata as any)?.riskScore || 'MEDIUM',
     behaviorType: behaviorType as any,
     engagementScore,
-    invoiceAmount: Number(amount),
+    invoiceAmount: Number(invoice.amount),
     daysOverdue,
-    stage
+    stage: invoice.reminderStage
   })
 
-  // Handle Pre-Due Checkpoint
-  if (daysOverdue === -3 && stage === 0) {
-    if (['HIGH_RISK_GHOST', 'AVOIDANT'].includes(behaviorType)) {
-      log.info('Emitting pre-due risk warning for high-risk client', { invoiceId, behaviorType })
-      eventBus.emit('invoice.predue_warning', {
-        invoiceId,
-        userId,
-        clientName,
-        dueDate: new Date(dueDate),
-        behaviorType,
-      })
-    } else {
-      log.info('Skipping pre-due warning for safe client', { invoiceId, behaviorType })
-    }
-    return
-  }
-
   if (decision.action === 'WAIT') {
-    log.info('Next action engine suggested WAIT. Rescheduling.', { invoiceId, reason: decision.reason })
+    log.info('AI suggested WAIT. Rescheduling.', { invoiceId, reason: decision.reason })
     if (chaseUntilPaid) {
       await scheduleRecurringCheck(job.data, daysOverdue + Math.ceil(chaseIntervalDays / 2)) 
     }
     return
   }
 
-  let finalChannel = contactChannel
-  if (decision.action === 'SWITCH_CHANNEL') {
-    finalChannel = 'SMS'
-    log.info('Next action engine suggested channel switch to SMS', { invoiceId })
-  }
+  // 4. FSM Transition
+  let event: InvoiceFSMEvent = 'CHECKPOINT_REACHED'
+  if (daysOverdue === -3) event = 'REACH_DUE_SOON'
+  else if (daysOverdue === 0) event = 'REACH_DUE_DATE'
 
-  // Only emit overdue if we haven't already sent a reminder for this stage
-  if (invoice.reminderStage >= stage) {
-    log.info('Invoice already at or past this reminder stage, skipping', {
-      invoiceId,
-      currentStage: invoice.reminderStage,
-      checkStage: stage,
-    })
-    return
-  }
-
-  // Invoice is still unpaid at this checkpoint — emit overdue event
-  log.info('Invoice overdue confirmed', {
-    invoiceId,
-    daysOverdue,
-    stage,
-    currentStage: invoice.reminderStage,
+  const result = transitionInvoice(event, {
+    currentState: invoice.state,
+    chasingProfile: invoice.chasingProfile,
+    balance: Number(invoice.balance),
+    amount: Number(invoice.amount),
+    isGhost: behaviorType === 'AVOIDANT' || behaviorType === 'HIGH_RISK_GHOST' || invoice.client?.behaviorProfile === 'GHOST',
+    isShieldMode: invoice.user.shieldMode
   })
 
-  eventBus.emit('invoice.overdue', {
-    invoiceId,
-    userId,
-    clientEmail,
-    clientName,
-    amount,
-    dueDate: new Date(dueDate),
-    daysOverdue,
-    stage,
-    contactChannel: finalChannel || 'EMAIL',
-    whatsappNumber: whatsappNumber || null,
-    smsNumber: smsNumber || null,
-    paymentLinkToken,
-    reminderTone,
-    chaseUntilPaid,
-    chaseIntervalDays,
-  })
-
-  // If chase-until-paid is enabled, schedule the NEXT check right now
-  if (chaseUntilPaid) {
-    const nextDaysOverdue = daysOverdue + chaseIntervalDays
-    // Only schedule if it's the final stage (4) or already recurring (5+)
-    if (stage >= 4) {
-      await scheduleRecurringCheck(job.data, nextDaysOverdue)
-      log.info('Scheduled next recurring check', { invoiceId, nextDaysOverdue })
+  // 5. Persist State Change + Side Effects atomically via Outbox
+  if (result.nextState !== invoice.state || result.sideEffect === 'SEND_REMINDER') {
+    let finalChannel = contactChannel || 'EMAIL'
+    if (decision.action === 'SWITCH_CHANNEL') {
+      finalChannel = 'SMS'
+      log.info('AI suggested channel switch to SMS', { invoiceId })
     }
+
+    await prisma.$transaction(async (tx) => {
+      // State transition with optimistic lock
+      if (result.nextState !== invoice.state) {
+        const updated = await tx.invoice.updateMany({
+          where: { 
+            id: invoiceId, 
+            version: invoice.version,  // Optimistic lock
+          },
+          data: {
+            state: result.nextState,
+            lastStateChangeAt: new Date(),
+            stateMetadata: {
+              lastTransitionEvent: event,
+              reason: result.reason,
+              aiDecision: decision.reason
+            },
+            version: { increment: 1 },
+          }
+        })
+
+        if (updated.count === 0) {
+          log.warn('Optimistic lock conflict — invoice was modified concurrently, skipping', { invoiceId })
+          return // Transaction will rollback (no side effects emitted)
+        }
+
+        log.info('Invoice state transitioned', { invoiceId, from: invoice.state, to: result.nextState, reason: result.reason })
+      }
+
+      // Write side-effect to Outbox (emitted by outbox worker)
+      if (result.sideEffect === 'SEND_REMINDER') {
+        await tx.outboxEvent.create({
+          data: {
+            eventType: 'invoice.overdue',
+            payload: {
+              ...job.data,
+              dueDate: new Date(job.data.dueDate).toISOString(),
+              contactChannel: finalChannel,
+              stage: invoice.reminderStage + 1,
+            },
+          }
+        })
+      }
+    })
+  }
+
+  // 7. Schedule next recurring check if at terminal chasing states
+  if (chaseUntilPaid && (result.nextState === 'FINAL_NOTICE' || result.nextState === 'RECURRING_CHASE')) {
+    await scheduleRecurringCheck(job.data, daysOverdue + chaseIntervalDays)
   }
 }
 
 /**
  * Create and start the overdue check worker.
- * Higher concurrency is fine here — we're just doing DB reads + event emits.
  */
 export function startOverdueCheckWorker(concurrency = 10): Worker<OverdueCheckJobData> {
   const connection = createRedisConnection()
@@ -187,29 +159,14 @@ export function startOverdueCheckWorker(concurrency = 10): Worker<OverdueCheckJo
   )
 
   worker.on('completed', (job) => {
-    log.info('Overdue check completed', {
-      jobId: job.id,
-      invoiceId: job.data.invoiceId,
-      daysOverdue: job.data.daysOverdue,
-    })
+    log.info('Overdue check completed', { jobId: job.id, invoiceId: job.data.invoiceId })
   })
 
   worker.on('failed', (job, err) => {
-    log.error('Overdue check failed', {
-      jobId: job?.id,
-      invoiceId: job?.data.invoiceId,
-      error: err.message,
-    })
+    log.error('Overdue check failed', { jobId: job?.id, invoiceId: job?.data.invoiceId, error: err.message })
   })
 
-  worker.on('error', (err) => {
-    log.error('Overdue check worker error', { error: err.message })
-  })
-
-  log.info('Overdue check worker started', {
-    concurrency,
-    queue: QUEUE_NAMES.OVERDUE_CHECK,
-  })
+  log.info('FSM-Enabled Overdue check worker started', { concurrency, queue: QUEUE_NAMES.OVERDUE_CHECK })
 
   return worker
 }

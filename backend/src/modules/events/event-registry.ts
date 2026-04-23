@@ -1,5 +1,6 @@
 import { registerNotificationSubscribers } from '@/modules/notification/notification.subscriber'
 import { registerAuditSubscribers } from '@/modules/events/audit.subscriber'
+import { initBehaviorSubscriber } from '@/modules/ai/behavior.subscriber'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'event-registry' })
@@ -22,6 +23,7 @@ export function registerAllEventHandlers(): void {
 
   registerNotificationSubscribers()
   registerAuditSubscribers()
+  initBehaviorSubscriber()
   // Future: registerAnalyticsSubscribers(), registerWebhookSubscribers(), etc.
 
   registered = true

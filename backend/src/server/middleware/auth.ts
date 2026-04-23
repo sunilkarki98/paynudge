@@ -47,10 +47,6 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
   }
 
   req.user = payload
-  log.info('Authenticated request', { userId: payload.userId, email: payload.email, path: req.path })
-  log.info('Authenticated user', { userId: payload.userId, email: payload.email })
-
-
-
+  log.info('Authenticated request', { userId: payload.userId, path: req.path })
   next()
 }

@@ -1,6 +1,8 @@
 import { google } from 'googleapis'
+import * as crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { encrypt, decrypt } from '@/lib/encryption'
+import { getSetting } from '@/lib/settings'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'google-oauth' })
@@ -10,33 +12,57 @@ const SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ]
 
-function getOAuth2Client() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
-  )
+// Used to sign the state parameter for CSRF protection
+const OAUTH_STATE_SECRET = process.env.ENCRYPTION_KEY || process.env.SUPABASE_JWT_SECRET || 'fallback-secret-do-not-use-in-prod'
+
+function signState(userId: string): string {
+  const hmac = crypto.createHmac('sha256', OAUTH_STATE_SECRET)
+  hmac.update(userId)
+  const signature = hmac.digest('hex')
+  return `${userId}.${signature}`
+}
+
+function verifyState(state: string): string | null {
+  const parts = state.split('.')
+  if (parts.length !== 2) return null
+  const [userId, signature] = parts
+  const expectedSignature = crypto.createHmac('sha256', OAUTH_STATE_SECRET).update(userId).digest('hex')
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature)) ? userId : null
+}
+
+async function getOAuth2Client() {
+  const clientId = await getSetting('GOOGLE_CLIENT_ID', process.env.GOOGLE_CLIENT_ID)
+  const clientSecret = await getSetting('GOOGLE_CLIENT_SECRET', process.env.GOOGLE_CLIENT_SECRET)
+  // Assuming redirect URI usually isn't changed often, but we can allow it or keep env fallback
+  const redirectUri = process.env.GOOGLE_REDIRECT_URI || `${process.env.NEXT_PUBLIC_APP_URL}/api/settings/google/callback`
+
+  return new google.auth.OAuth2(clientId, clientSecret, redirectUri)
 }
 
 /**
  * Generate the Google OAuth authorization URL.
  * User is redirected here to grant permission.
  */
-export function getAuthorizationUrl(userId: string): string {
-  const client = getOAuth2Client()
+export async function getAuthorizationUrl(userId: string): Promise<string> {
+  const client = await getOAuth2Client()
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent', // Always show consent to get refresh token
-    state: userId, // Pass userId to identify user in callback
+    state: signState(userId), // Pass signed userId to identify user and prevent CSRF
   })
 }
 
 /**
  * Exchange authorization code for tokens and store them encrypted.
  */
-export async function handleOAuthCallback(code: string, userId: string): Promise<{ email: string }> {
-  const client = getOAuth2Client()
+export async function handleOAuthCallback(code: string, state: string): Promise<{ email: string }> {
+  const userId = verifyState(state)
+  if (!userId) {
+    throw new Error('Invalid or forged OAuth state parameter')
+  }
+
+  const client = await getOAuth2Client()
   const { tokens } = await client.getToken(code)
 
   if (!tokens.access_token) {
@@ -84,7 +110,7 @@ export async function getGmailClient(userId: string) {
 
   if (!credential) return null
 
-  const client = getOAuth2Client()
+  const client = await getOAuth2Client()
   const accessToken = decrypt(credential.accessToken)
   const refreshToken = credential.refreshToken ? decrypt(credential.refreshToken) : undefined
 
@@ -190,7 +216,7 @@ export async function disconnectGoogle(userId: string): Promise<void> {
   if (credential) {
     // Try to revoke the token
     try {
-      const client = getOAuth2Client()
+      const client = await getOAuth2Client()
       const accessToken = decrypt(credential.accessToken)
       await client.revokeToken(accessToken)
     } catch {

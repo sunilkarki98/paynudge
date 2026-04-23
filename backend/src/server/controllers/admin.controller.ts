@@ -1,4 +1,6 @@
 import { Request, Response } from 'express'
+import nodemailer from 'nodemailer'
+import Twilio from 'twilio'
 import { getSetting, setSetting } from '@/lib/settings'
 import { prisma } from '@/lib/prisma'
 import { logger } from '@/lib/logger'
@@ -13,7 +15,29 @@ export async function getSettings(_req: Request, res: Response): Promise<void> {
     const parserModel = await getSetting('GEMINI_PARSER_MODEL', 'gemini-1.5-flash')
     const generatorModel = await getSetting('GEMINI_GENERATOR_MODEL', 'gemini-2.0-flash')
 
-    res.json({ apiKey, parserModel, generatorModel })
+    // SMTP
+    const smtpHost = await getSetting('SMTP_HOST', '')
+    const smtpPort = await getSetting('SMTP_PORT', '')
+    const smtpUser = await getSetting('SMTP_USER', '')
+    const smtpPass = await getSetting('SMTP_PASS', '')
+    const smtpFrom = await getSetting('SMTP_FROM', '')
+
+    // Twilio
+    const twilioAccountSid = await getSetting('TWILIO_ACCOUNT_SID', '')
+    const twilioAuthToken = await getSetting('TWILIO_AUTH_TOKEN', '')
+    const twilioPhoneNumber = await getSetting('TWILIO_PHONE_NUMBER', '')
+    const twilioWhatsappNumber = await getSetting('TWILIO_WHATSAPP_NUMBER', '')
+
+    // Google OAuth
+    const googleClientId = await getSetting('GOOGLE_CLIENT_ID', '')
+    const googleClientSecret = await getSetting('GOOGLE_CLIENT_SECRET', '')
+
+    res.json({ 
+      apiKey, parserModel, generatorModel,
+      smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom,
+      twilioAccountSid, twilioAuthToken, twilioPhoneNumber, twilioWhatsappNumber,
+      googleClientId, googleClientSecret
+    })
   } catch (error) {
     log.error('Get settings error', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ error: 'Failed to fetch settings' })
@@ -26,20 +50,67 @@ export async function updateSettings(req: Request, res: Response): Promise<void>
   try {
     const body = req.body
 
-    if (typeof body.apiKey === 'string') {
-      await setSetting('GEMINI_API_KEY', body.apiKey)
+    // --- Validation Pre-checks ---
+
+    // 1. SMTP Validation
+    if (body.smtpHost && body.smtpUser && body.smtpPass) {
+      try {
+        const port = parseInt(body.smtpPort || '587')
+        const transporter = nodemailer.createTransport({
+          host: body.smtpHost,
+          port,
+          secure: port === 465,
+          auth: { user: body.smtpUser, pass: body.smtpPass },
+        })
+        await transporter.verify()
+      } catch (err) {
+        log.warn('SMTP validation failed', { error: err instanceof Error ? err.message : String(err) })
+        res.status(400).json({ error: 'Invalid SMTP configuration. Connection refused or authentication failed.' })
+        return
+      }
     }
-    if (typeof body.parserModel === 'string' && body.parserModel) {
-      await setSetting('GEMINI_PARSER_MODEL', body.parserModel)
+
+    // 2. Twilio Validation
+    if (body.twilioAccountSid && body.twilioAuthToken) {
+      try {
+        const client = Twilio(body.twilioAccountSid, body.twilioAuthToken)
+        await client.api.accounts(body.twilioAccountSid).fetch()
+      } catch (err) {
+        log.warn('Twilio validation failed', { error: err instanceof Error ? err.message : String(err) })
+        res.status(400).json({ error: 'Invalid Twilio Account SID or Auth Token.' })
+        return
+      }
     }
-    if (typeof body.generatorModel === 'string' && body.generatorModel) {
-      await setSetting('GEMINI_GENERATOR_MODEL', body.generatorModel)
-    }
+
+    // --- Save Settings ---
+
+    // AI Settings
+    if (typeof body.apiKey === 'string') await setSetting('GEMINI_API_KEY', body.apiKey)
+    if (typeof body.parserModel === 'string' && body.parserModel) await setSetting('GEMINI_PARSER_MODEL', body.parserModel)
+    if (typeof body.generatorModel === 'string' && body.generatorModel) await setSetting('GEMINI_GENERATOR_MODEL', body.generatorModel)
+
+    // SMTP Settings
+    if (typeof body.smtpHost === 'string') await setSetting('SMTP_HOST', body.smtpHost)
+    if (typeof body.smtpPort === 'string') await setSetting('SMTP_PORT', body.smtpPort)
+    if (typeof body.smtpUser === 'string') await setSetting('SMTP_USER', body.smtpUser)
+    if (typeof body.smtpPass === 'string') await setSetting('SMTP_PASS', body.smtpPass)
+    if (typeof body.smtpFrom === 'string') await setSetting('SMTP_FROM', body.smtpFrom)
+
+    // Twilio Settings
+    if (typeof body.twilioAccountSid === 'string') await setSetting('TWILIO_ACCOUNT_SID', body.twilioAccountSid)
+    if (typeof body.twilioAuthToken === 'string') await setSetting('TWILIO_AUTH_TOKEN', body.twilioAuthToken)
+    if (typeof body.twilioPhoneNumber === 'string') await setSetting('TWILIO_PHONE_NUMBER', body.twilioPhoneNumber)
+    if (typeof body.twilioWhatsappNumber === 'string') await setSetting('TWILIO_WHATSAPP_NUMBER', body.twilioWhatsappNumber)
+
+    // Google OAuth Settings
+    if (typeof body.googleClientId === 'string') await setSetting('GOOGLE_CLIENT_ID', body.googleClientId)
+    if (typeof body.googleClientSecret === 'string') await setSetting('GOOGLE_CLIENT_SECRET', body.googleClientSecret)
 
     res.json({ success: true })
   } catch (error) {
     log.error('Update settings error', { error: error instanceof Error ? error.message : String(error) })
-    res.status(500).json({ error: 'Failed to update settings' })
+    // Return 500 but also pass the message back if possible, though standard is generic
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update settings' })
   }
 }
 

@@ -1,4 +1,5 @@
 import Twilio from 'twilio'
+import { getSetting } from '@/lib/settings'
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
 import { logger } from '@/lib/logger'
@@ -63,7 +64,10 @@ export async function sendWhatsApp(options: WhatsAppSendOptions): Promise<WhatsA
   }
 
   // Mode B: Use system Twilio
-  if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+  const sysSid = await getSetting('TWILIO_ACCOUNT_SID', process.env.TWILIO_ACCOUNT_SID)
+  const sysToken = await getSetting('TWILIO_AUTH_TOKEN', process.env.TWILIO_AUTH_TOKEN)
+
+  if (sysSid && sysToken) {
     try {
       const result = await sendWithSystemTwilio(to, message)
       return result
@@ -112,13 +116,15 @@ async function sendWithSystemTwilio(
   to: string,
   message: string
 ): Promise<WhatsAppSendResult> {
-  const client = Twilio(
-    process.env.TWILIO_ACCOUNT_SID!,
-    process.env.TWILIO_AUTH_TOKEN!
-  )
+  const accountSid = await getSetting('TWILIO_ACCOUNT_SID', process.env.TWILIO_ACCOUNT_SID)
+  const authToken = await getSetting('TWILIO_AUTH_TOKEN', process.env.TWILIO_AUTH_TOKEN)
+  const whatsappNumber = await getSetting('TWILIO_WHATSAPP_NUMBER', process.env.TWILIO_WHATSAPP_NUMBER)
+  const phoneNumber = await getSetting('TWILIO_PHONE_NUMBER', process.env.TWILIO_PHONE_NUMBER)
+
+  const client = Twilio(accountSid!, authToken!)
 
   // Use a dedicated WhatsApp number env var, or fall back to the general Twilio number
-  const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER!
+  const fromNumber = whatsappNumber || phoneNumber!
 
   const result = await client.messages.create({
     body: `[Invoice Chaser] ${message}`,

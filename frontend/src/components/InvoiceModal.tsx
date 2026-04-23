@@ -7,7 +7,16 @@ interface InvoiceModalProps {
   onClose: () => void
   onSubmit: (data: InvoiceFormData) => Promise<void>
   initialData?: InvoiceFormData | null
-  clients?: Array<{ id: string; name: string; email: string; whatsappNumber?: string | null; smsNumber?: string | null; chasingProfile?: string; contactChannel?: string }>
+  clients?: Array<{ 
+    id: string; 
+    name: string; 
+    email: string; 
+    whatsappNumber?: string | null; 
+    smsNumber?: string | null; 
+    chasingProfile?: string; 
+    contactChannel?: string;
+    behaviorType?: string | null;
+  }>
 }
 
 export interface InvoiceFormData {
@@ -21,6 +30,7 @@ export interface InvoiceFormData {
   smsNumber?: string
   chasingProfile?: string
   contactChannel?: string
+  behaviorType?: string // Added for FSM intelligence
 }
 
 export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, clients }: InvoiceModalProps) {
@@ -34,6 +44,7 @@ export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, c
     smsNumber: '',
     chasingProfile: 'NORMAL',
     contactChannel: 'EMAIL',
+    behaviorType: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -45,7 +56,8 @@ export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, c
     } else {
       setFormData({ 
         clientName: '', clientEmail: '', amount: '', dueDate: '', description: '',
-        whatsappNumber: '', smsNumber: '', chasingProfile: 'NORMAL', contactChannel: 'EMAIL'
+        whatsappNumber: '', smsNumber: '', chasingProfile: 'NORMAL', contactChannel: 'EMAIL',
+        behaviorType: ''
       })
     }
   }, [initialData, isOpen])
@@ -62,6 +74,7 @@ export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, c
         smsNumber: client.smsNumber || '',
         chasingProfile: client.chasingProfile || 'NORMAL',
         contactChannel: client.contactChannel || 'EMAIL',
+        behaviorType: client.behaviorType || '',
       }))
     }
   }
@@ -190,6 +203,44 @@ export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, c
           {/* Advanced Settings Content */}
           {showAdvanced && (
             <div className="space-y-4 animate-slide-down pb-2">
+              {/* Intelligence Tagging Section */}
+              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-100/50 space-y-3">
+                <p className="text-[11px] font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Behavior Intelligence
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">Intelligence Tag</label>
+                    <select
+                      value={formData.behaviorType || ''}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, behaviorType: e.target.value }))}
+                      className="w-full px-3 py-2.5 rounded-lg bg-white border border-indigo-100 text-sm text-text-primary focus:border-indigo-500 transition-all shadow-sm"
+                    >
+                      <option value="">AI Default (Auto)</option>
+                      <option value="RELIABLE">⭐ VIP / Reliable</option>
+                      <option value="SLOW_PAYER">🐢 Known Slow Payer</option>
+                      <option value="AVOIDANT">👻 Avoidant / High Risk</option>
+                      <option value="DISHONEST">⚠️ Dishonest / Disputed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1.5">Chasing Profile</label>
+                    <select
+                      value={formData.chasingProfile || 'NORMAL'}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, chasingProfile: e.target.value }))}
+                      className="w-full px-3 py-2.5 rounded-lg bg-white border border-indigo-100 text-sm text-text-primary focus:border-indigo-500 transition-all shadow-sm"
+                    >
+                      <option value="STRICT">Strict (Fast)</option>
+                      <option value="NORMAL">Normal</option>
+                      <option value="RELAXED">Relaxed (Slow)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-500 mb-2">WhatsApp Number</label>
@@ -213,34 +264,20 @@ export default function InvoiceModal({ isOpen, onClose, onSubmit, initialData, c
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-500 mb-2">Risk Profile</label>
-                  <select
-                    value={formData.chasingProfile || 'NORMAL'}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, chasingProfile: e.target.value }))}
-                    className="w-full px-4 py-3.5 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all shadow-inner"
-                  >
-                    <option value="STRICT">Strict (Fast)</option>
-                    <option value="NORMAL">Normal</option>
-                    <option value="RELAXED">Relaxed (Slow)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-500 mb-2">Channel Options</label>
-                  <select
-                    value={formData.contactChannel || 'EMAIL'}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, contactChannel: e.target.value }))}
-                    className="w-full px-4 py-3.5 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all shadow-inner"
-                  >
-                    <option value="EMAIL">Email Only</option>
-                    <option value="WHATSAPP">WhatsApp Only</option>
-                    <option value="SMS">SMS Only</option>
-                    <option value="BOTH">Email + WhatsApp</option>
-                    <option value="EMAIL_AND_SMS">Email + SMS</option>
-                    <option value="ALL">All Channels</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-500 mb-2">Primary Channel</label>
+                <select
+                  value={formData.contactChannel || 'EMAIL'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, contactChannel: e.target.value }))}
+                  className="w-full px-4 py-3.5 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 transition-all shadow-inner"
+                >
+                  <option value="EMAIL">Email Only</option>
+                  <option value="WHATSAPP">WhatsApp Only</option>
+                  <option value="SMS">SMS Only</option>
+                  <option value="BOTH">Email + WhatsApp</option>
+                  <option value="EMAIL_AND_SMS">Email + SMS</option>
+                  <option value="ALL">All Channels</option>
+                </select>
               </div>
             </div>
           )}

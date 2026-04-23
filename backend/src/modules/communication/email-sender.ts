@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import { sendViaGmail, isGoogleConnected } from './google-oauth'
+import { getSetting } from '@/lib/settings'
 import { logger } from '@/lib/logger'
 
 const log = logger.child({ module: 'email-sender' })
@@ -73,18 +74,24 @@ export async function sendEmail(options: SendEmailOptions): Promise<SendResult> 
 // ─── SMTP Sender ────────────────────────────────────────
 
 let transporter: nodemailer.Transporter | null = null
+let lastHost = ''
 
-function getTransporter(): nodemailer.Transporter {
-  if (transporter) return transporter
+async function getTransporter(): Promise<nodemailer.Transporter> {
+  const host = await getSetting('SMTP_HOST', process.env.SMTP_HOST || 'smtp.gmail.com')
+  const port = parseInt(await getSetting('SMTP_PORT', process.env.SMTP_PORT || '587'))
+  const user = await getSetting('SMTP_USER', process.env.SMTP_USER || '')
+  const pass = await getSetting('SMTP_PASS', process.env.SMTP_PASS || '')
+
+  // Re-create transporter if host changes or doesn't exist
+  if (transporter && lastHost === host) return transporter
+
   transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
   })
+  lastHost = host
   return transporter
 }
 
@@ -94,9 +101,11 @@ async function sendViaSMTP(
   htmlBody: string,
   plainText?: string
 ): Promise<void> {
-  const transport = getTransporter()
+  const transport = await getTransporter()
+  const from = await getSetting('SMTP_FROM', process.env.SMTP_FROM || '"Invoice Chaser" <noreply@invoicechaser.com>')
+  
   await transport.sendMail({
-    from: process.env.SMTP_FROM || '"Invoice Chaser" <noreply@invoicechaser.com>',
+    from,
     to,
     subject,
     html: htmlBody,

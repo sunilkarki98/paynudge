@@ -22,7 +22,7 @@ export default function AdminSettingsPage() {
   const [isUnlocked, setIsUnlocked] = useState(false)
   const [authError, setAuthError] = useState('')
 
-  const [activeTab, setActiveTab] = useState<'ai' | 'users'>('ai')
+  const [activeTab, setActiveTab] = useState<'ai' | 'email' | 'sms' | 'oauth' | 'users'>('ai')
 
   // AI Config State
   const [apiKey, setApiKey] = useState('')
@@ -30,6 +30,23 @@ export default function AdminSettingsPage() {
   const [generatorModel, setGeneratorModel] = useState('')
   const [availableModels, setAvailableModels] = useState<ModelMeta[]>([])
   const [isDetecting, setIsDetecting] = useState(false)
+
+  // SMTP Config State
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('')
+  const [smtpUser, setSmtpUser] = useState('')
+  const [smtpPass, setSmtpPass] = useState('')
+  const [smtpFrom, setSmtpFrom] = useState('')
+
+  // Twilio Config State
+  const [twilioAccountSid, setTwilioAccountSid] = useState('')
+  const [twilioAuthToken, setTwilioAuthToken] = useState('')
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('')
+  const [twilioWhatsappNumber, setTwilioWhatsappNumber] = useState('')
+
+  // Google OAuth Config State
+  const [googleClientId, setGoogleClientId] = useState('')
+  const [googleClientSecret, setGoogleClientSecret] = useState('')
   
   // User Management State
   const [users, setUsers] = useState<UserData[]>([])
@@ -58,11 +75,25 @@ export default function AdminSettingsPage() {
     setAuthError('')
     
     try {
-      // 1. Fetch AI settings
+      // 1. Fetch all settings
       const result = await callAdmin('/admin/settings') as any
       setApiKey(result.apiKey || '')
       setParserModel(result.parserModel || '')
       setGeneratorModel(result.generatorModel || '')
+
+      setSmtpHost(result.smtpHost || '')
+      setSmtpPort(result.smtpPort || '')
+      setSmtpUser(result.smtpUser || '')
+      setSmtpPass(result.smtpPass || '')
+      setSmtpFrom(result.smtpFrom || '')
+
+      setTwilioAccountSid(result.twilioAccountSid || '')
+      setTwilioAuthToken(result.twilioAuthToken || '')
+      setTwilioPhoneNumber(result.twilioPhoneNumber || '')
+      setTwilioWhatsappNumber(result.twilioWhatsappNumber || '')
+
+      setGoogleClientId(result.googleClientId || '')
+      setGoogleClientSecret(result.googleClientSecret || '')
       
       // 2. Fetch Users
       const userResult = await callAdmin('/admin/users') as any
@@ -96,17 +127,19 @@ export default function AdminSettingsPage() {
             setParserModel(prev => prev || result.models[0].id)
             setGeneratorModel(prev => prev || result.models[0].id)
         }
+        setMessage({ type: 'success', text: 'AI Models detected successfully.' })
       } else {
-        throw new Error(result.error)
+        throw new Error(result.error || 'Failed to detect models. Invalid API key?')
       }
-    } catch (err) {
+    } catch (err: any) {
        setAvailableModels([])
+       setMessage({ type: 'error', text: err.message || 'Failed to authenticate and detect models. Check your API key.' })
     } finally {
       setIsDetecting(false)
     }
   }
 
-  const handleSaveAI = async (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSaving(true)
     setMessage(null)
@@ -114,11 +147,16 @@ export default function AdminSettingsPage() {
     try {
       await callAdmin('/admin/settings', {
         method: 'POST',
-        body: JSON.stringify({ apiKey, parserModel, generatorModel })
+        body: JSON.stringify({ 
+          apiKey, parserModel, generatorModel,
+          smtpHost, smtpPort, smtpUser, smtpPass, smtpFrom,
+          twilioAccountSid, twilioAuthToken, twilioPhoneNumber, twilioWhatsappNumber,
+          googleClientId, googleClientSecret
+        })
       }) as any
-      setMessage({ type: 'success', text: 'System AI Settings saved successfully. Changes are live instantly.' })
-    } catch (err) {
-       setMessage({ type: 'error', text: 'Failed to save settings.' })
+      setMessage({ type: 'success', text: 'System settings saved successfully. Changes are live instantly.' })
+    } catch (err: any) {
+       setMessage({ type: 'error', text: err.message || 'Failed to save settings.' })
     } finally {
       setIsSaving(false)
     }
@@ -171,9 +209,22 @@ export default function AdminSettingsPage() {
     )
   }
 
+  const TabButton = ({ tab, label }: { tab: typeof activeTab, label: string }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`px-4 py-2.5 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${
+        activeTab === tab 
+          ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' 
+          : 'text-text-secondary hover:text-text-primary hover:bg-surface-raised'
+      }`}
+    >
+      {label}
+    </button>
+  )
+
   return (
-    <div className="space-y-8 animate-fade-in">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-8 animate-fade-in pb-20">
+      <div className="flex flex-col gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text-primary">Admin Center</h1>
           <p className="text-text-secondary mt-1">
@@ -181,27 +232,12 @@ export default function AdminSettingsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 p-1 glass-card border border-surface-border rounded-xl">
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
-              activeTab === 'ai' 
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' 
-                : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            AI Configuration
-          </button>
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`px-6 py-2.5 rounded-lg font-medium text-sm transition-all ${
-              activeTab === 'users' 
-                ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' 
-                : 'text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            User Management
-          </button>
+        <div className="flex items-center gap-1 p-1 glass-card border border-surface-border rounded-xl overflow-x-auto custom-scrollbar">
+          <TabButton tab="ai" label="AI Configuration" />
+          <TabButton tab="email" label="Email (SMTP)" />
+          <TabButton tab="sms" label="Twilio (SMS/WA)" />
+          <TabButton tab="oauth" label="Google OAuth" />
+          <TabButton tab="users" label="User Management" />
         </div>
       </div>
 
@@ -213,9 +249,10 @@ export default function AdminSettingsPage() {
           </div>
       )}
 
+      {/* AI CONFIGURATION TAB */}
       {activeTab === 'ai' && (
         <div className="glass-card rounded-2xl p-6 md:p-8 max-w-3xl border border-surface-border">
-            <form onSubmit={handleSaveAI} className="space-y-6">
+            <form onSubmit={handleSaveSettings} className="space-y-6">
                <div className="space-y-2">
                   <label className="block text-sm font-semibold tracking-wider text-text-primary uppercase">
                       Master Google Gemini API Key
@@ -260,7 +297,6 @@ export default function AdminSettingsPage() {
                               <option key={m.id} value={m.id}>{m.displayName} ({m.id})</option>
                           ))}
                       </select>
-                      <p className="text-xs text-text-muted mt-2">Recommended: <span className="font-mono text-emerald-400 font-semibold">gemini-1.5-flash</span> (Best balance of speed and JSON-structuring capabilities)</p>
                   </div>
   
                   <div>
@@ -279,16 +315,11 @@ export default function AdminSettingsPage() {
                               <option key={m.id} value={m.id}>{m.displayName} ({m.id})</option>
                           ))}
                       </select>
-                      <p className="text-xs text-text-muted mt-2">Recommended: <span className="font-mono text-emerald-400 font-semibold">gemini-2.0-flash</span> (superior conversational reasoning and strict tone adherence)</p>
                   </div>
               </div>
   
               <div className="pt-6">
-                  <button
-                      type="submit"
-                      disabled={isSaving || !apiKey || !parserModel || !generatorModel}
-                      className="w-full sm:w-auto px-10 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-800 text-white font-bold hover:shadow-lg hover:shadow-red-500/20 disabled:opacity-50 transition-all"
-                  >
+                  <button type="submit" disabled={isSaving} className="w-full sm:w-auto px-10 py-3 rounded-xl bg-gradient-to-r from-red-600 to-red-800 text-white font-bold hover:shadow-lg hover:shadow-red-500/20 disabled:opacity-50 transition-all">
                       {isSaving ? 'Deploying Changes...' : 'Save & Deploy AI Configuration'}
                   </button>
               </div>
@@ -296,6 +327,99 @@ export default function AdminSettingsPage() {
         </div>
       )}
 
+      {/* EMAIL CONFIGURATION TAB */}
+      {activeTab === 'email' && (
+        <div className="glass-card rounded-2xl p-6 md:p-8 max-w-3xl border border-surface-border">
+          <h2 className="text-xl font-bold text-text-primary mb-6">System Email SMTP (Fallback)</h2>
+          <form onSubmit={handleSaveSettings} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">SMTP Host</label>
+                <input type="text" value={smtpHost} onChange={e => setSmtpHost(e.target.value)} placeholder="smtp.sendgrid.net" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">SMTP Port</label>
+                <input type="text" value={smtpPort} onChange={e => setSmtpPort(e.target.value)} placeholder="587" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">SMTP User</label>
+                <input type="text" value={smtpUser} onChange={e => setSmtpUser(e.target.value)} placeholder="apikey" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">SMTP Password</label>
+                <input type="password" value={smtpPass} onChange={e => setSmtpPass(e.target.value)} placeholder="••••••••••••••••" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-text-secondary mb-1">From Address</label>
+                <input type="text" value={smtpFrom} onChange={e => setSmtpFrom(e.target.value)} placeholder="PayNudge <noreply@example.com>" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+                <p className="text-xs text-text-muted mt-1">Must be verified with your SMTP provider (e.g. SendGrid Single Sender).</p>
+              </div>
+            </div>
+            <div className="pt-4">
+              <button type="submit" disabled={isSaving} className="px-8 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50">
+                {isSaving ? 'Saving...' : 'Save SMTP Settings'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* TWILIO CONFIGURATION TAB */}
+      {activeTab === 'sms' && (
+        <div className="glass-card rounded-2xl p-6 md:p-8 max-w-3xl border border-surface-border">
+          <h2 className="text-xl font-bold text-text-primary mb-6">System Twilio (SMS & WhatsApp)</h2>
+          <form onSubmit={handleSaveSettings} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Account SID</label>
+              <input type="password" value={twilioAccountSid} onChange={e => setTwilioAccountSid(e.target.value)} placeholder="AC..." className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Auth Token</label>
+              <input type="password" value={twilioAuthToken} onChange={e => setTwilioAuthToken(e.target.value)} placeholder="••••••••••••••••" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">Phone Number (SMS)</label>
+                <input type="text" value={twilioPhoneNumber} onChange={e => setTwilioPhoneNumber(e.target.value)} placeholder="+1234567890" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-text-secondary mb-1">WhatsApp Number</label>
+                <input type="text" value={twilioWhatsappNumber} onChange={e => setTwilioWhatsappNumber(e.target.value)} placeholder="whatsapp:+1234567890" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+              </div>
+            </div>
+            <div className="pt-4">
+              <button type="submit" disabled={isSaving} className="px-8 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50">
+                {isSaving ? 'Saving...' : 'Save Twilio Settings'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* GOOGLE OAUTH CONFIGURATION TAB */}
+      {activeTab === 'oauth' && (
+        <div className="glass-card rounded-2xl p-6 md:p-8 max-w-3xl border border-surface-border">
+          <h2 className="text-xl font-bold text-text-primary mb-6">Google OAuth Integration</h2>
+          <p className="text-sm text-text-secondary mb-6">Allows users to connect their own Gmail accounts to send invoices natively.</p>
+          <form onSubmit={handleSaveSettings} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Client ID</label>
+              <input type="password" value={googleClientId} onChange={e => setGoogleClientId(e.target.value)} placeholder="...apps.googleusercontent.com" className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">Client Secret</label>
+              <input type="password" value={googleClientSecret} onChange={e => setGoogleClientSecret(e.target.value)} placeholder="GOCSPX-..." className="w-full px-4 py-2 rounded-xl bg-surface-raised border border-surface-border text-text-primary focus:border-red-500" />
+            </div>
+            <div className="pt-4">
+              <button type="submit" disabled={isSaving} className="px-8 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-500 disabled:opacity-50">
+                {isSaving ? 'Saving...' : 'Save Google OAuth Settings'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* USER MANAGEMENT TAB */}
       {activeTab === 'users' && (
         <div className="glass-card rounded-2xl border border-surface-border overflow-hidden">
           <div className="overflow-x-auto">

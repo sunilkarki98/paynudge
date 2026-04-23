@@ -234,33 +234,79 @@ export async function scheduleRecurringCheck(data: OverdueCheckJobData, newDaysO
 
 /**
  * Cancel all pending overdue check jobs for an invoice.
- * Called when an invoice is marked as paid.
+ * Called when an invoice is marked as paid, voided, or frozen.
+ * 
+ * Scans both standard checkpoint jobs AND recurring chase jobs
+ * by checking all delayed/waiting jobs for the invoice's job ID prefix.
  */
 export async function cancelPendingOverdueChecks(invoiceId: string): Promise<number> {
   const queue = getOverdueCheckQueue()
   let cancelled = 0
+  const jobIdPrefix = `overdue:${invoiceId}:`
 
-  // Cancel across all possible checkpoint configurations
-  for (const day of [-3, 1, 3, 5, 7, 14, 30]) {
-    const jobId = `overdue:${invoiceId}:day:${day}`
-    try {
-      const job = await queue.getJob(jobId)
-      if (job) {
-        const state = await job.getState()
-        if (state === 'delayed' || state === 'waiting') {
+  try {
+    // 1. Cancel standard checkpoint jobs (known day values)
+    for (const day of [-3, 1, 3, 5, 7, 14, 30]) {
+      const jobId = `overdue:${invoiceId}:day:${day}`
+      try {
+        const job = await queue.getJob(jobId)
+        if (job) {
+          const state = await job.getState()
+          if (state === 'delayed' || state === 'waiting') {
+            await job.remove()
+            cancelled++
+            log.info('Cancelled pending overdue check', { jobId, invoiceId, day, state })
+          }
+        }
+      } catch (err) {
+        log.warn('Failed to cancel overdue check', {
+          jobId, invoiceId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    }
+
+    // 2. Cancel recurring chase jobs by scanning delayed jobs
+    // Recurring jobs have IDs like: overdue:<id>:day:<N>:recurring
+    const delayedJobs = await queue.getDelayed()
+    for (const job of delayedJobs) {
+      if (job.id && job.id.startsWith(jobIdPrefix)) {
+        try {
           await job.remove()
           cancelled++
-          log.info('Cancelled pending overdue check', { jobId, invoiceId, day, state })
+          log.info('Cancelled recurring overdue check', { jobId: job.id, invoiceId })
+        } catch (err) {
+          log.warn('Failed to cancel recurring job', {
+            jobId: job.id, invoiceId,
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       }
-    } catch (err) {
-      log.warn('Failed to cancel overdue check', {
-        jobId,
-        invoiceId,
-        error: err instanceof Error ? err.message : String(err),
-      })
     }
+
+    // 3. Also check waiting jobs
+    const waitingJobs = await queue.getWaiting()
+    for (const job of waitingJobs) {
+      if (job.id && job.id.startsWith(jobIdPrefix)) {
+        try {
+          await job.remove()
+          cancelled++
+          log.info('Cancelled waiting overdue check', { jobId: job.id, invoiceId })
+        } catch (err) {
+          log.warn('Failed to cancel waiting job', {
+            jobId: job.id, invoiceId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        }
+      }
+    }
+  } catch (err) {
+    log.error('Error during job cancellation sweep', {
+      invoiceId,
+      error: err instanceof Error ? err.message : String(err),
+    })
   }
 
+  log.info('Job cancellation complete', { invoiceId, totalCancelled: cancelled })
   return cancelled
 }
